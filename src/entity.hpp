@@ -18,15 +18,18 @@ class Entity {
     static constexpr float MovingWobbleAmplitude = 0.075f;
     static constexpr float MovingWobbleSpeed = 12.0f;
 
-    std::shared_ptr<Gang> gang;
+    const EntityTextures &textures;
     sf::RectangleShape shape;
+    float radius;
+
     float wobble_position;
     float wobble_amplitude;
-    unsigned health;
-    float radius;
-    float time_since_attacked;
+
+    std::shared_ptr<Gang> gang;
     Entity *target;
-    const EntityTextures &textures;
+    
+    unsigned health;
+    float time_since_attacked;
 
 public:
     enum class Direction { Left, Right };

@@ -2,13 +2,15 @@
 #include <vector>
 #include <algorithm>
 #include <limits>
+#include <math.h>
 #include <SFML/Graphics.hpp>
 #include "entity.hpp"
 
 Entity::Entity(const EntityTextures &textures): 
-    textures(textures), gang(nullptr), target(nullptr), 
+    textures(textures), radius(0.0f),
     wobble_position(0.0f), wobble_amplitude(StandingWobbleAmplitude),
-    time_since_attacked(0.0f) {}
+    gang(nullptr), target(nullptr), 
+    health(0), time_since_attacked(0.0f) {}
 
 Entity::~Entity() {
     removeFromChunks(shape.getPosition());
@@ -316,8 +318,10 @@ sf::Vector2f Gang::makeSpawnPoint() const {
     return getRandomRectPosition(spawnable_points[rand() % 4]);
 }
 
-Gang::Gang(std::shared_ptr<GameMap> game_map, const Team team): team(team), game_map(game_map) {
-    walk_towards = getRandomRectPosition(game_map->getInnerArena());
+Gang::Gang(std::shared_ptr<GameMap> game_map, const Team team): 
+    team(team), game_map(game_map),
+    walk_towards(getRandomRectPosition(game_map->getInnerArena()))
+{
     if(team == Team::Player) {
         move_info.to_move = false;
     } else {
