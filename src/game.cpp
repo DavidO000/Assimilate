@@ -17,10 +17,13 @@ class Game {
     sf::RectangleShape grave;
 
 public:
-    Game() {
-        window = sf::RenderWindow(sf::VideoMode({800, 600}), "Die, or give it to the next!!");
-        time_since_last_second = 0.0f;
-        frames_since_last_second = 0;
+    Game(): 
+        window(sf::RenderWindow(sf::VideoMode({800, 600}), "Die, or give it to the next!!")),
+        time_since_last_second(0.0f), frames_since_last_second(0),
+        mouse_position({}), left_click(false), 
+        grave(sf::RectangleShape({50.0f, 50.0f})) 
+    {
+        grave.setFillColor(sf::Color::Black);
 
         constexpr sf::Vector2f inner_arena_size = {1000.0f, 1000.0f};
         const sf::Rect<float> inner_arena(-inner_arena_size / 2.0f, inner_arena_size);
@@ -48,11 +51,6 @@ public:
             }
             gangs.push_back(gang);
         }
-
-        mouse_position = {};
-        left_click = false;
-        grave = sf::RectangleShape({50.0f, 50.0f});
-        grave.setFillColor(sf::Color::Black);
     }
 
 private:
