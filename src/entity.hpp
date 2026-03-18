@@ -36,6 +36,12 @@ public:
 
     Entity(const EntityTextures &textures);
     virtual ~Entity();
+    // This object should never be copied implicitly!
+    Entity(const Entity&) = delete;
+    Entity& operator=(const Entity&) = delete;
+    Entity(Entity&&) = delete;
+    Entity& operator=(Entity&&) = delete;
+    friend std::ostream& operator<<(std::ostream& out, const Entity &entity);
 
     sf::Vector2f getOrigin() const;
     bool isDead() const;
@@ -102,6 +108,14 @@ class Gang {
 
 public:
     Gang(std::shared_ptr<GameMap> game_map, const Team team);
+    ~Gang() = default; // No explicit destructor, all handled by smart pointers!
+    // This object should never be copied implicitly!
+    Gang(const Gang&) = delete;
+    Gang& operator=(const Gang&) = delete;
+    Gang(Gang&&) = delete;
+    Gang& operator=(Gang&&) = delete;
+    friend std::ostream& operator<<(std::ostream& out, const Gang &gang);
+
     static void addEntity(std::shared_ptr<Gang> gang, std::unique_ptr<Entity> entity);
 
     bool isEmpty() const;
@@ -128,8 +142,14 @@ class ChunkIterator {
     sf::Vector2u position;
 
     ChunkIterator(GameMap &map, const sf::Vector2u start, const sf::Vector2u end);
-
 public:
+    ~ChunkIterator() = default; // No explicit destructor necessary.
+    // This object should never be copied implicitly!
+    ChunkIterator(const ChunkIterator&) = delete;
+    ChunkIterator& operator=(const ChunkIterator&) = delete;
+    ChunkIterator(ChunkIterator&&) = delete;
+    ChunkIterator& operator=(ChunkIterator&&) = delete;
+    friend std::ostream& operator<<(std::ostream& out, const ChunkIterator &chunk_iterator);
     std::vector<Entity*> *next();
 };
 
@@ -150,6 +170,13 @@ public:
         const sf::Vector2f chunk_size, const sf::Vector2u chunk_amounts, 
         const sf::Rect<float> inner_arena, const sf::RectangleShape &outer_arena
     );
+    ~GameMap() = default; // No explicit destructor necessary.
+    // This object is expensive, and should never be copied implicitly!
+    GameMap(const GameMap&) = delete;
+    GameMap& operator=(const GameMap&) = delete;
+    GameMap(GameMap&&) = delete;
+    GameMap& operator=(GameMap&&) = delete;
+    friend std::ostream& operator<<(std::ostream& out, const GameMap &game_map);
 
     sf::Rect<float> getInnerArena() const;
     const sf::RectangleShape &getOuterArena() const;

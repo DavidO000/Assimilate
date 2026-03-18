@@ -26,6 +26,16 @@ Entity::~Entity() {
     found:;
 }
 
+std::ostream& operator<<(std::ostream& out, const Entity &entity) {
+    out << "Textures: " << entity.textures 
+        << ", Position: " << entity.shape.getPosition().x << ", " << entity.shape.getPosition().y
+        << ", Size: " << entity.shape.getSize().x << ", " << entity.shape.getSize().y
+        << ", Scale: " << entity.shape.getScale().x << ", " << entity.shape.getScale().y
+        << ", Scale: " << entity.shape.getScale().x << ", " << entity.shape.getScale().y
+        << ", Radius: " << entity.radius << " , Health: " << entity.health; 
+    return out;
+}
+
 sf::Vector2f Entity::getOrigin() const {
     return shape.getPosition() + shape.getSize().componentWiseMul({1.0f, -1.0f}) / 2.0f;
 }
@@ -332,6 +342,17 @@ Gang::Gang(std::shared_ptr<GameMap> game_map, const Team team):
     }
 }
 
+std::ostream& operator<<(std::ostream& out, const Gang &gang) {
+    out << "Team: " << gang.team
+        << ", Entities: " << gang.entities.size()
+        << ", Spawn position: " << gang.spawn_position.x << ", " << gang.spawn_position.y
+        << ", Walk towards: " << gang.walk_towards.x << ", " << gang.walk_towards.y
+        << ", Grave: ";
+    if(const auto &grave_position = gang.grave_position) out << grave_position->x << ", " << grave_position->y;
+    else out << "None";
+    return out;
+}
+
 void Gang::addEntity(std::shared_ptr<Gang> gang, std::unique_ptr<Entity> entity) {
     entity->gang = gang;
     entity->health = entity->getInitialHealth();
@@ -468,6 +489,13 @@ void Gang::update(const float dt) {
 ChunkIterator::ChunkIterator(GameMap &map, const sf::Vector2u start, const sf::Vector2u end): 
     map(map), start(start), end(end), position(start) {}
 
+std::ostream& operator<<(std::ostream& out, const ChunkIterator &chunk_iterator) {
+    out << "Start: " << chunk_iterator.start.x << ", " << chunk_iterator.start.y
+        << ", End: " << chunk_iterator.end.x << ", " << chunk_iterator.end.y
+        << ", Position: " << chunk_iterator.position.x << ", " << chunk_iterator.position.y;
+    return out;
+}
+
 std::vector<Entity*> *ChunkIterator::next() {
     if(position.x > end.x || position.y > end.y) return nullptr;
 
@@ -487,6 +515,13 @@ GameMap::GameMap(
     const sf::Rect<float> inner_arena, const sf::RectangleShape &outer_arena
 ): chunk_size(chunk_size), chunk_amounts(chunk_amounts), inner_arena(inner_arena), outer_arena(outer_arena) {
     for(unsigned i = 0; i < chunk_amounts.x * chunk_amounts.y; i++) map.push_back({});
+}
+
+std::ostream& operator<<(std::ostream& out, const GameMap &game_map) {
+    out << "Entities: " << game_map.all_entities_cache.size()
+        << ", Chunk size: " << game_map.chunk_size.x << ", " << game_map.chunk_size.x
+        << ", Chunk amounts: " << game_map.chunk_amounts.x << ", " << game_map.chunk_amounts.y;
+    return out;
 }
 
 sf::Rect<float> GameMap::getInnerArena() const {

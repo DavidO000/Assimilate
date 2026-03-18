@@ -53,6 +53,14 @@ public:
         }
     }
 
+    friend std::ostream& operator<<(std::ostream& out, const Game &game) {
+        out << "Mouse position: ";
+        if(const auto &mouse_position = game.mouse_position) out << mouse_position->x << ", " << mouse_position->y;
+        else out << "None";
+        out << ", Left clicked: " << game.left_click;
+        return out;
+    }
+
 private:
     void update() {
         while(const std::optional event = window.pollEvent()) {
