@@ -12,6 +12,7 @@ class ChunkIterator;
 
 class Entity {
     friend class Gang;
+    friend class GameMap;
 
     static constexpr float StandingWobbleAmplitude = 0.05f;
     static constexpr float StandingWobbleSpeed = 2.5f;
@@ -19,7 +20,7 @@ class Entity {
     static constexpr float MovingWobbleSpeed = 12.0f;
 
     const EntityTextures &textures;
-    sf::RectangleShape shape;
+    sf::Sprite sprite;
     float radius;
 
     float wobble_position;
@@ -30,6 +31,9 @@ class Entity {
     
     unsigned health;
     float time_since_attacked;
+
+    float time_since_revived;
+    float time_since_was_attacked;
 
 public:
     enum class Direction { Left, Right };
@@ -128,7 +132,7 @@ public:
 
     void updateWondering(const float dt);
     void removeDeadTroops();
-    void updateCollision();
+    void updateAggroLoss();
     void moveAllEntities(std::shared_ptr<Gang> to);
     void update(const float dt);
 };
@@ -179,7 +183,6 @@ public:
     friend std::ostream& operator<<(std::ostream& out, const GameMap &game_map);
 
     sf::Rect<float> getInnerArena() const;
-    const sf::RectangleShape &getOuterArena() const;
     sf::Rect<float> getBoundry() const;
 
 private:
@@ -188,5 +191,6 @@ private:
     ChunkIterator iterateChunksInRadius(const sf::Vector2f position, const float radius);
 
 public:
+    void updateCollisions();
     void draw(sf::RenderWindow &window);
 };

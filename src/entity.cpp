@@ -6,14 +6,15 @@
 #include <SFML/Graphics.hpp>
 #include "entity.hpp"
 
-Entity::Entity(const EntityTextures &textures): 
-    textures(textures), radius(0.0f),
+Entity::Entity(const EntityTextures &textures):
+    textures(textures), sprite(textures.getDead()), radius(0.0f),
     wobble_position(0.0f), wobble_amplitude(StandingWobbleAmplitude),
     gang(nullptr), target(nullptr), 
-    health(0), time_since_attacked(0.0f) {}
+    health(0), time_since_attacked(0.0f),
+    time_since_revived(INFINITY), time_since_was_attacked(INFINITY) {}
 
 Entity::~Entity() {
-    removeFromChunks(shape.getPosition());
+    removeFromChunks(getOrigin());
     auto &all_entitites = gang->game_map->all_entities_cache;
     for(unsigned i = 0; i < all_entitites.size(); i++) {
         if(all_entitites.at(i) == this) {
@@ -28,16 +29,16 @@ Entity::~Entity() {
 
 std::ostream& operator<<(std::ostream& out, const Entity &entity) {
     out << "Textures: " << entity.textures 
-        << ", Position: " << entity.shape.getPosition().x << ", " << entity.shape.getPosition().y
-        << ", Size: " << entity.shape.getSize().x << ", " << entity.shape.getSize().y
-        << ", Scale: " << entity.shape.getScale().x << ", " << entity.shape.getScale().y
-        << ", Scale: " << entity.shape.getScale().x << ", " << entity.shape.getScale().y
+        << ", Position: " << entity.sprite.getPosition().x << ", " << entity.sprite.getPosition().y
+        << ", Size: " << entity.sprite.getTexture().getSize().x << ", " << entity.sprite.getTexture().getSize().y
+        << ", Scale: " << entity.sprite.getScale().x << ", " << entity.sprite.getScale().y
+        << ", Scale: " << entity.sprite.getScale().x << ", " << entity.sprite.getScale().y
         << ", Radius: " << entity.radius << " , Health: " << entity.health; 
     return out;
 }
 
 sf::Vector2f Entity::getOrigin() const {
-    return shape.getPosition() + shape.getSize().componentWiseMul({1.0f, -1.0f}) / 2.0f;
+    return sprite.getPosition() + sf::Vector2f(sprite.getTexture().getSize()).componentWiseMul({1.0, -1.0}) / 2.0f;
 }
 
 bool Entity::isDead() const {
@@ -49,7 +50,8 @@ void Entity::takeDamage(const unsigned amount) {
     if(isDead()) {
         target = nullptr;
         setTexture(textures.getDead());
-        shape.setScale({1.0f, -1.0f});
+        sprite.setScale({1.0f, -1.0f});
+        sprite.setColor(sf::Color::White);
 
         if(gang->team == Team::Enemy) {
             bool are_all_dead = true;
@@ -63,6 +65,8 @@ void Entity::takeDamage(const unsigned amount) {
                 gang->grave_position = getOrigin();
             }
         }
+    } else {
+        time_since_was_attacked = 0.0f;
     }
 }
 
@@ -73,7 +77,19 @@ void Entity::takeKnockback(const sf::Vector2f from, const float amount) {
 }
 
 void Entity::draw(sf::RenderWindow &window) const {
-    window.draw(shape);
+    window.draw(sprite);
+
+    if(time_since_revived < 0.3f) {
+        sf::ConvexShape revive_triangle(3);
+        sf::Vector2f bottom = sprite.getPosition() + sf::Vector2f(sprite.getTexture().getSize()).componentWiseDiv(sf::Vector2f(2, -100));
+        float distance_from = (time_since_revived - 0.15) * sprite.getTexture().getSize().x;
+        revive_triangle.setFillColor(sf::Color(255, 255, 255, uint8_t(0.3 / (0.3 - time_since_revived) * 255)));
+        revive_triangle.setPoint(0, bottom - sf::Vector2f(0, sprite.getTexture().getSize().y * 1.5f - (time_since_revived * time_since_revived + time_since_revived) * 40.0f));
+        revive_triangle.setPoint(1, bottom - sf::Vector2f(distance_from, 0));
+        revive_triangle.setPoint(2, bottom + sf::Vector2f(distance_from, 0));
+        window.draw(revive_triangle);
+    }
+
     const bool Debugging = true;
     if(Debugging && target != nullptr) {
         sf::RectangleShape rect({10.f, 10.0f});
@@ -88,20 +104,19 @@ Entity* Entity::getTarget() {
 }
 
 void Entity::setTexture(const sf::Texture &texture) {
-    shape.setTexture(&texture);
-    shape.setSize(sf::Vector2f(texture.getSize()));
+    sprite.setTexture(texture);
     setDirection(getDirection());
 }
 
 void Entity::setDirection(const Direction direction) {
-    const auto texture_size = shape.getTexture()->getSize();
+    const auto texture_size = sprite.getTexture().getSize();
     if(direction == Direction::Left) {
-        shape.setTextureRect(sf::Rect<int>(
+        sprite.setTextureRect(sf::Rect<int>(
             sf::Vector2i(0, texture_size.y), 
             sf::Vector2i(texture_size.x, -int(texture_size.y))
         ));
     } else if(direction == Direction::Right) {
-        shape.setTextureRect(sf::Rect<int>(
+        sprite.setTextureRect(sf::Rect<int>(
             sf::Vector2i(texture_size.x, texture_size.y), 
             sf::Vector2i(-int(texture_size.x), -int(texture_size.y))
         ));
@@ -109,17 +124,17 @@ void Entity::setDirection(const Direction direction) {
 }
 
 Entity::Direction Entity::getDirection() const {
-    return shape.getTextureRect().size.x > 0 ? Direction::Left : Direction::Right;
+    return sprite.getTextureRect().size.x > 0 ? Direction::Left : Direction::Right;
 }
 
 void Entity::progressWobble(const float desired_amplitude, const float speed, const float dt) {
     wobble_position += speed * dt;
     wobble_amplitude += (desired_amplitude - wobble_amplitude) * std::clamp(dt, 0.0f, 1.0f);
-    shape.setScale({1.0f, -1.0f + sin(wobble_position) * wobble_amplitude});
+    sprite.setScale({1.0f, -1.0f + sin(wobble_position) * wobble_amplitude});
 }
 
 void Entity::addToChunks() {
-    auto iterator = gang->game_map->iterateChunksInRadius(shape.getPosition(), radius);
+    auto iterator = gang->game_map->iterateChunksInRadius(sprite.getPosition(), radius);
     while(auto chunk = iterator.next()) {
         chunk->push_back(this);
     }
@@ -141,15 +156,11 @@ void Entity::removeFromChunks(const sf::Vector2f old_position) {
 }
 
 void Entity::move(const sf::Vector2f offset) {
-    const sf::Vector2u old_index = gang->game_map->getIndex(shape.getPosition());
-    const sf::Vector2f old_position = shape.getPosition();
-    shape.move(offset);
-    shape.setPosition(clampPoint(shape.getPosition(), gang->game_map->getBoundry()));
-    const sf::Vector2u new_index = gang->game_map->getIndex(shape.getPosition());
-    if(old_index != new_index) {
-        removeFromChunks(old_position);
-        addToChunks();
-    }
+    const sf::Vector2f old_position = sprite.getPosition();
+    sprite.move(offset);
+    sprite.setPosition(clampPoint(sprite.getPosition(), gang->game_map->getBoundry()));
+    removeFromChunks(old_position);
+    addToChunks();
 }
 
 void Entity::walkTowards(const sf::Vector2f destination, const float dt) {
@@ -173,7 +184,7 @@ float Entity::updateCollision() {
     if(isDead()) return 0.0f;
 
     float squabbling = 0.0f;
-    auto iterator = gang->game_map->iterateChunksInRadius(shape.getPosition(), radius);
+    auto iterator = gang->game_map->iterateChunksInRadius(sprite.getPosition(), radius);
     while(const auto chunk = iterator.next()) {
         for(unsigned i = 0; i < chunk->size(); i++) {
             const auto other = chunk->at(i);
@@ -196,7 +207,7 @@ float Entity::updateCollision() {
 }
 
 void Entity::searchAggro(const float search_radius) {
-    auto iterator = gang->game_map->iterateChunksInRadius(shape.getPosition(), search_radius);
+    auto iterator = gang->game_map->iterateChunksInRadius(sprite.getPosition(), search_radius);
     while(auto chunk = iterator.next()) {
         for(unsigned i = 0; i < chunk->size(); i++) {
             const auto other = chunk->at(i);
@@ -278,8 +289,13 @@ void Entity::updateAggroGain() {
 void Entity::update(const float dt) {
     if(isDead()) return;
 
-    updateAggroLoss();
     updateAggroGain();
+
+    time_since_revived += dt;
+    time_since_was_attacked += dt;
+
+    if(time_since_was_attacked < 0.2) sprite.setColor(sf::Color(160, 160, 160));
+    else sprite.setColor(sf::Color::White);
 
     if(target == nullptr) {
         if(gang->shouldMove()) {
@@ -359,10 +375,10 @@ void Gang::addEntity(std::shared_ptr<Gang> gang, std::unique_ptr<Entity> entity)
     entity->radius = entity->getRadius();
 
     entity->setTexture(entity->textures.getAlive(gang->team));
-    entity->shape.setPosition(gang->spawn_position);
-    entity->shape.setPosition(clampPoint(entity->shape.getPosition(), gang->game_map->getBoundry()));
+    entity->sprite.setPosition(gang->spawn_position);
+    entity->sprite.setPosition(clampPoint(entity->sprite.getPosition(), gang->game_map->getBoundry()));
 
-    auto iterator = gang->game_map->iterateChunksInRadius(entity->shape.getPosition(), entity->radius);
+    auto iterator = gang->game_map->iterateChunksInRadius(entity->sprite.getPosition(), entity->radius);
     while(auto chunk = iterator.next()) {
         chunk->push_back(entity.get());
     }
@@ -432,23 +448,13 @@ void Gang::removeDeadTroops() {
     }
 }
 
-void Gang::updateCollision() {
-    static constexpr unsigned MaxCollisionIterations = 10;
-    static constexpr float MinSquabblingCutoff = 10.0;
-    for(unsigned i = 0; i < MaxCollisionIterations; i++) {
-        float squabbling = 0.0f;
-        for(auto &entity: entities) {
-            squabbling += entity->updateCollision();
-        }
-        if(squabbling < MinSquabblingCutoff) break;
-    }
-}
-
 void Gang::moveAllEntities(std::shared_ptr<Gang> to) {
     for(auto &entity: entities) {
         entity->health = entity->getInitialHealth();
         entity->gang = to;
         entity->setTexture(entity->textures.getAlive(to->team));
+        entity->time_since_was_attacked = INFINITY;
+        entity->time_since_revived = 0.0f;
     }
     to->entities.insert(
         to->entities.end(),
@@ -456,6 +462,12 @@ void Gang::moveAllEntities(std::shared_ptr<Gang> to) {
         std::make_move_iterator(entities.end())
     );
     entities.clear();
+}
+
+void Gang::updateAggroLoss() {
+    for(const auto &entity: entities) {
+        entity->updateAggroLoss();
+    }
 }
 
 void Gang::update(const float dt) {
@@ -476,12 +488,6 @@ void Gang::update(const float dt) {
     } else if(team == Team::Player) {
         removeDeadTroops();
     }
-
-    for(auto &entity: entities) {
-        entity->updateAggroLoss();
-    }
-
-    updateCollision();
 }
 
 
@@ -528,10 +534,6 @@ sf::Rect<float> GameMap::getInnerArena() const {
     return inner_arena;
 }
 
-const sf::RectangleShape &GameMap::getOuterArena() const {
-    return outer_arena;
-}
-
 sf::Rect<float> GameMap::getBoundry() const {
     sf::Vector2f rectangle_size = chunk_size.componentWiseMul(sf::Vector2f(chunk_amounts));
     static constexpr sf::Vector2f iota(0.1f, 0.1f);
@@ -563,8 +565,20 @@ ChunkIterator GameMap::iterateChunksInRadius(const sf::Vector2f position, const 
     return ChunkIterator(*this, start, end);
 }
 
+void GameMap::updateCollisions() {
+    static constexpr unsigned MaxCollisionIterations = 10;
+    static constexpr float MinSquabblingCutoff = 10.0;
+    for(unsigned i = 0; i < MaxCollisionIterations; i++) {
+        float squabbling = 0.0f;
+        for(auto &entity: all_entities_cache) {
+            squabbling += entity->updateCollision();
+        }
+        if(squabbling < MinSquabblingCutoff) break;
+    }
+}
+
 void GameMap::draw(sf::RenderWindow &window) {
-    window.draw(getOuterArena());
+    window.draw(outer_arena);
     std::sort(all_entities_cache.begin(), all_entities_cache.end(), 
         [](const Entity *x, const Entity *y) {
             if(x->isDead() && !y->isDead()) return true;

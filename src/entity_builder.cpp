@@ -46,10 +46,14 @@ public:
 };
 
 class EntityBuilder {
+    sf::Texture arena;
+    sf::Texture grave;
     EntityTextures grunt;
 
 public:
     EntityBuilder() {
+        if(!grave.loadFromFile("assets/gravestone.png")) std::cerr << "Could not load texture!" << std::endl;
+        if(!arena.loadFromFile("assets/arena.png")) std::cerr << "Could not load texture!" << std::endl;
         if(!grunt.player.loadFromFile("assets/player_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
         if(!grunt.enemy.loadFromFile("assets/enemy_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
         if(!grunt.dead.loadFromFile("assets/dead_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
@@ -65,6 +69,9 @@ public:
         out << "Grunt: " << entity_builder.grunt;
         return out;
     }
+
+    const sf::Texture &getGrave() const { return grave; }
+    const sf::Texture &getArena() const { return arena; }
 
     const EntityTextures &getGrunt() const { return grunt; }
 };
