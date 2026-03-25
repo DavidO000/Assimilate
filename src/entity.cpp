@@ -14,7 +14,7 @@ Entity::Entity(const EntityTextures &textures):
     time_since_revived(INFINITY), time_since_was_attacked(INFINITY) {}
 
 Entity::~Entity() {
-    removeFromChunks(getOrigin());
+    removeFromChunks(sprite.getPosition());
     auto &all_entitites = gang->game_map->all_entities_cache;
     for(unsigned i = 0; i < all_entitites.size(); i++) {
         if(all_entitites.at(i) == this) {
