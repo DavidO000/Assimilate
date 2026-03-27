@@ -5,7 +5,7 @@ public:
     explicit Grunt(const EntityBuilder &entity_builder): Entity(entity_builder.getGrunt()) {}
     
     float getRadius() const override { return 25.0f; }
-    float getSpeed() const override { return 350.0f; }
+    float getSpeed() const override { return 500.0f; }
     unsigned getInitialHealth() const override { return 100; }
     // unsigned getMaximumHealth() const override { return 100; }
     float getAggroRadius() const override { return 100.0f; }

@@ -21,6 +21,17 @@ sf::Vector2f getRandomRectPosition(const sf::Rect<float> rect) {
     };
 }
 
+template<typename T> bool removeFromVector(std::vector<T> *vector, const T &element) {
+    for(unsigned i = 0; i < vector->size(); i++) {
+        if(vector->at(i) == element) {
+            std::swap(vector->at(i), vector->at(vector->size() - 1));
+            vector->pop_back();
+            return true;
+        }
+    }
+    return false;
+}
+
 template<typename T> sf::Rect<T> debug(const sf::Rect<T> rect)  {
     std::cout << "debug: " << rect.position.x << " " << rect.position.y << ", " << rect.size.x << " " << rect.size.y << std::endl;
     return rect;

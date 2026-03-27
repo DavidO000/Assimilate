@@ -101,7 +101,7 @@ private:
             time_until_next_spawn = rand() % 8 + 2;
             for(unsigned i = 0; i < 1; i++) {
                 auto gang = std::make_shared<Gang>(game_map, Team::Enemy);
-                unsigned amount = std::sqrt(time_since_started) + 1;
+                unsigned amount = std::pow(time_since_started, 0.75) + 1;
                 for(unsigned j = 0; j < amount; j++) {
                     auto ptr = std::make_unique<Grunt>(entity_builder);
                     Gang::addEntity(gang, std::move(ptr));

@@ -53,6 +53,9 @@ public:
     void takeKnockback(const sf::Vector2f from, const float amount);
     void draw(sf::RenderWindow &window) const;
 
+protected:
+    Entity* getTarget();
+
     virtual float getRadius() const = 0;
     virtual float getSpeed() const = 0;
     virtual unsigned getInitialHealth() const = 0;
@@ -65,17 +68,13 @@ public:
     virtual float getAttackSpeed() const = 0;
     virtual void attack() = 0;
 
-protected:
-    Entity* getTarget();
-
 private:
-    void setTexture(const sf::Texture &texture);
     void setDirection(const Direction direction);
-    Direction getDirection() const;
     void progressWobble(const float desired_amplitude, const float speed, const float dt);
 
+    // ChunkIterator iterateOverChunks();
     void addToChunks();
-    void removeFromChunks(const sf::Vector2f old_position);
+    void removeFromChunks();
     void move(const sf::Vector2f offset);
     void walkTowards(const sf::Vector2f destination, const float dt);
     float updateCollision();
