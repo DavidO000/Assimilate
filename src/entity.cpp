@@ -25,7 +25,6 @@ std::ostream& operator<<(std::ostream& out, const Entity &entity) {
         << ", Position: " << entity.getOrigin().x << ", " << entity.getOrigin().y
         << ", Size: " << entity.sprite.getTexture().getSize().x << ", " << entity.sprite.getTexture().getSize().y
         << ", Scale: " << entity.sprite.getScale().x << ", " << entity.sprite.getScale().y
-        << ", Scale: " << entity.sprite.getScale().x << ", " << entity.sprite.getScale().y
         << ", Radius: " << entity.getRadius() << " , Health: " << entity.health; 
     return out;
 }
@@ -526,8 +525,8 @@ void GameMap::updateMovement() {
     for(auto &entity: all_entities_cache) {
         if(entity->isDead()) continue;
         auto iterator = iterateChunksInRadius(entity->getOrigin(), entity->radius);
-        while(const auto chunk = iterator.next()) {
-            for(auto other : *chunk) {
+        while(const auto &chunk = iterator.next()) {
+            for(auto other: *chunk) {
                 if(other <= entity || other->isDead()) continue;
                 pairs.push_back({entity, other});
             }
@@ -538,12 +537,12 @@ void GameMap::updateMovement() {
 
     static constexpr unsigned MaxCollisionIterations = 10;
     for(unsigned i = 0; i < MaxCollisionIterations; i++) {
-        for(auto &entity : all_entities_cache) {
+        for(auto &entity: all_entities_cache) {
             if(entity->isDead()) continue;
             entity->sprite.move(entity->to_move / float(MaxCollisionIterations));
         }
 
-        for(auto &[entity, other] : pairs) {
+        for(auto &[entity, other]: pairs) {
             const sf::Vector2f delta = entity->getOrigin() - other->getOrigin();
             const float maximum_distance = entity->radius + other->radius;
             const float to_push_length = maximum_distance - delta.length();
