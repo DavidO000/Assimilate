@@ -32,16 +32,19 @@ template<typename T> bool removeFromVector(std::vector<T> *vector, const T &elem
     return false;
 }
 
+// cppcheck-suppress unusedFunction
 template<typename T> [[maybe_unused]] sf::Rect<T> debug(const sf::Rect<T> rect)  {
     std::cout << "debug: " << rect.position.x << " " << rect.position.y << ", " << rect.size.x << " " << rect.size.y << std::endl;
     return rect;
 };
 
+// cppcheck-suppress unusedFunction
 template<typename T> [[maybe_unused]] sf::Vector2<T> debug(const sf::Vector2<T> vec)  {
     std::cout << "debug: " << vec.x << " " << vec.y << std::endl;
     return vec;
 };
 
+// cppcheck-suppress unusedFunction
 template<typename T> [[maybe_unused]] T debug(const T &x)  {
     std::cout << "debug: " << x << std::endl;
     return x;

@@ -525,7 +525,7 @@ void GameMap::updateMovement() {
     for(auto &entity: all_entities_cache) {
         if(entity->isDead()) continue;
         auto iterator = iterateChunksInRadius(entity->getOrigin(), entity->radius);
-        while(const auto &chunk = iterator.next()) {
+        while(const auto *const chunk = iterator.next()) {
             for(auto other: *chunk) {
                 if(other <= entity || other->isDead()) continue;
                 pairs.push_back({entity, other});
