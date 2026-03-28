@@ -48,7 +48,7 @@ public:
             Gang::addEntity(troops, std::move(ptr));
         }
 
-        for(unsigned i = 0; i < 0; i++) {
+        for(unsigned i = 0; i < 5; i++) {
             auto gang = std::make_shared<Gang>(game_map, Team::Enemy);
             unsigned amount = rand() % 5 + 1;
             for(unsigned j = 0; j < amount; j++) {
@@ -100,7 +100,7 @@ private:
             frames_since_last_second = 0;
         }
 
-        float dt = std::min(real_dt, 1.0f / 30.0f);
+        float dt = std::min(real_dt, 1.0f / 60.0f);
         time_since_last_spawn += dt;
         time_since_started += dt;
         if(time_since_last_spawn > time_until_next_spawn) {
@@ -133,7 +133,7 @@ private:
         troops->update(dt);
         for(const auto &gang: gangs) gang->update(dt);
 
-        game_map->updateCollisions();
+        game_map->updateMovement();
 
         window.setView({
             troops->isEmpty() ? window.getView().getCenter() : troops->getAveragePosition(), 

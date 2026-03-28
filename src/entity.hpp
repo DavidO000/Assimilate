@@ -23,6 +23,9 @@ class Entity {
     sf::Sprite sprite;
     float radius;
 
+    sf::Vector2f to_move;
+    sf::Vector2f to_separate;
+
     float wobble_position;
     float wobble_amplitude;
 
@@ -75,9 +78,7 @@ private:
     // ChunkIterator iterateOverChunks();
     void addToChunks();
     void removeFromChunks();
-    void move(const sf::Vector2f offset);
     void walkTowards(const sf::Vector2f destination, const float dt);
-    float updateCollision();
 
     void searchAggro(const float search_radius);
     void updateAggroLoss();
@@ -190,6 +191,6 @@ private:
     ChunkIterator iterateChunksInRadius(const sf::Vector2f position, const float radius);
 
 public:
-    void updateCollisions();
+    void updateMovement();
     void draw(sf::RenderWindow &window);
 };

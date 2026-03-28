@@ -66,7 +66,7 @@ void Entity::takeDamage(const unsigned amount) {
 void Entity::takeKnockback(const sf::Vector2f from, const float amount) {
     const sf::Vector2f delta = getOrigin() - from;
     if(delta.length() == 0) return;
-    move(delta.normalized() * amount);
+    to_move += delta.normalized() * amount;
 }
 
 void Entity::draw(sf::RenderWindow &window) const {
@@ -132,55 +132,6 @@ void Entity::removeFromChunks() {
             std::cerr << "Chunk invariance not upheld." << std::endl;
         }
     }
-}
-
-void Entity::move(const sf::Vector2f offset) {
-    removeFromChunks();
-    sprite.setPosition(clampPoint(sprite.getPosition() + offset, gang->game_map->getBoundry()));
-    addToChunks();
-}
-
-void Entity::walkTowards(const sf::Vector2f destination, const float dt) {
-    const sf::Vector2f delta = destination - getOrigin();
-
-    if(delta.length() == 0.0) {
-        progressWobble(StandingWobbleAmplitude, StandingWobbleSpeed, dt);
-        return;
-    }
-
-    const auto normalised_delta = delta.normalized() * getSpeed() * dt;
-    const auto to_walk = delta.length() < normalised_delta.length() ? delta : normalised_delta;
-    move(to_walk);
-
-    const Direction new_direction = delta.x < 0.0f ? Direction::Left : Direction::Right;
-    setDirection(new_direction);
-    progressWobble(MovingWobbleAmplitude, MovingWobbleSpeed, dt);
-}
-
-float Entity::updateCollision() {
-    if(isDead()) return 0.0f;
-
-    float squabbling = 0.0f;
-    auto iterator = gang->game_map->iterateChunksInRadius(sprite.getPosition(), radius);
-    while(const auto chunk = iterator.next()) {
-        for(unsigned i = 0; i < chunk->size(); i++) {
-            const auto other = chunk->at(i);
-            if(other == this || other->isDead()) continue;
-
-            const sf::Vector2f delta = getOrigin() - other->getOrigin();
-            const float maximum_distance = radius + other->radius;
-            const float to_push_length = maximum_distance - delta.length();
-            if(to_push_length <= 0) continue;
-
-            const auto angle = delta.length() == 0.0f ? sf::radians(float(rand())) : delta.angle();
-            const sf::Vector2f to_push(to_push_length, angle);
-
-            move(to_push * 0.5f);
-            other->move(-to_push * 0.5f);
-            squabbling += to_push.length();
-        }
-    }
-    return squabbling;
 }
 
 void Entity::searchAggro(const float search_radius) {
@@ -261,6 +212,22 @@ void Entity::updateAggroGain() {
             askComradesForAggro();
         }
     }
+}
+
+void Entity::walkTowards(const sf::Vector2f destination, const float dt) {
+    const sf::Vector2f delta = destination - getOrigin();
+
+    if(delta.length() < 0.0) {
+        progressWobble(StandingWobbleAmplitude, StandingWobbleSpeed, dt);
+        return;
+    }
+
+    const auto normalised_delta = delta.normalized() * getSpeed() * dt;
+    to_move += delta.length() < normalised_delta.length() ? delta : normalised_delta;
+
+    const Direction new_direction = delta.x < 0.0f ? Direction::Left : Direction::Right;
+    setDirection(new_direction);
+    progressWobble(MovingWobbleAmplitude, MovingWobbleSpeed, dt);
 }
 
 void Entity::update(const float dt) {
@@ -538,13 +505,51 @@ ChunkIterator GameMap::iterateChunksInRadius(const sf::Vector2f position, const 
     return ChunkIterator(*this, start, end);
 }
 
-void GameMap::updateCollisions() {
+void GameMap::updateMovement() {
+
+    struct CollisionPair {
+        Entity* a;
+        Entity* b;
+    };
+    std::vector<CollisionPair> pairs;
+
+    for(auto &entity: all_entities_cache) {
+        if(entity->isDead()) continue;
+        auto iterator = iterateChunksInRadius(entity->sprite.getPosition(), entity->radius);
+        while(const auto chunk = iterator.next()) {
+            for(auto other : *chunk) {
+                if(other <= entity || other->isDead()) continue;
+                pairs.push_back({entity, other});
+            }
+        }
+    }
+
+    for(auto &chunk: map) chunk.clear();
+
     static constexpr unsigned MaxCollisionIterations = 10;
     for(unsigned i = 0; i < MaxCollisionIterations; i++) {
-        float squabbling = 0.0f;
-        for(auto &entity: all_entities_cache) {
-            squabbling += entity->updateCollision();
+        for(auto &entity : all_entities_cache) {
+            if(entity->isDead()) continue;
+            entity->sprite.move(entity->to_move / float(MaxCollisionIterations));
         }
+
+        for(auto &[entity, other] : pairs) {
+            const sf::Vector2f delta = entity->getOrigin() - other->getOrigin();
+            const float maximum_distance = entity->radius + other->radius;
+            const float to_push_length = maximum_distance - delta.length();
+            if(to_push_length <= 0) continue;
+
+            const auto angle = delta.length() == 0.0f ? sf::radians(float(rand())) : delta.angle();
+            const sf::Vector2f to_push(to_push_length, angle);
+            entity->sprite.move(to_push * 0.5f);
+            other->sprite.move(-to_push * 0.5f);
+        }
+    }
+
+    for(auto &entity: all_entities_cache) {
+        entity->to_move = {0.0f, 0.0f};
+        if(entity->isDead()) continue;
+        entity->addToChunks();
     }
 }
 
