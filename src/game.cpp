@@ -24,10 +24,10 @@ class Game {
 
 public:
     Game(): 
-        window(sf::RenderWindow(sf::VideoMode({800, 600}), "Die, or give it to the next!!")),
+        window(sf::RenderWindow(sf::VideoMode({800, 600}), "Assimilate")),
         time_since_started(0.0f), time_since_last_spawn(0.0f), time_until_next_spawn(0.0f),
         time_since_last_second(0.0f), frames_since_last_second(0),
-        mouse_position({}), left_click(false), zoom_factor(1.0f),
+        left_click(false), zoom_factor(1.0f),
         grave(sf::Sprite(entity_builder.getGrave()))
     {
         constexpr sf::Vector2f inner_arena_size = {5000.0f, 5000.0f};
@@ -43,12 +43,12 @@ public:
         game_map = std::make_shared<GameMap>(chunk_size, chunks, inner_arena, outer_arena);
 
         troops = std::make_shared<Gang>(game_map, Team::Player);
-        for(unsigned i = 0; i < 5; i++) {
+        for(unsigned i = 0; i < 100; i++) {
             auto ptr = std::make_unique<Grunt>(entity_builder);
             Gang::addEntity(troops, std::move(ptr));
         }
 
-        for(unsigned i = 0; i < 10; i++) {
+        for(unsigned i = 0; i < 0; i++) {
             auto gang = std::make_shared<Gang>(game_map, Team::Enemy);
             unsigned amount = rand() % 5 + 1;
             for(unsigned j = 0; j < amount; j++) {
@@ -66,8 +66,6 @@ private:
         while(const std::optional event = window.pollEvent()) {
             if (event->is<sf::Event::Closed>()) {
                 window.close();
-            } else if(const auto key_event = event->getIf<sf::Event::KeyReleased>()) {
-                if(key_event->code == sf::Keyboard::Key::A) debug(100);
             } else if(const auto mouse_scrolled_event = event->getIf<sf::Event::MouseWheelScrolled>()) {
                 zoom_factor = std::clamp(zoom_factor + mouse_scrolled_event->delta, 0.5f, 10.0f);
             } else if(const auto mouse_pressed_event = event->getIf<sf::Event::MouseButtonPressed>()) {
@@ -93,7 +91,16 @@ private:
             }
         }
 
-        float dt = clock.restart().asSeconds();
+        float real_dt = clock.restart().asSeconds();
+        time_since_last_second += real_dt;
+        frames_since_last_second++;
+        if(time_since_last_second > 1.0f) {
+            time_since_last_second -= 1.0f;
+            std::cout << "fps: " << frames_since_last_second << std::endl;
+            frames_since_last_second = 0;
+        }
+
+        float dt = std::min(real_dt, 1.0f / 30.0f);
         time_since_last_spawn += dt;
         time_since_started += dt;
         if(time_since_last_spawn > time_until_next_spawn) {
@@ -110,17 +117,9 @@ private:
             }
         }
 
-        time_since_last_second += dt;
-        frames_since_last_second++;
-        if(time_since_last_second > 1.0f) {
-            time_since_last_second -= 1.0f;
-            std::cout << "fps: " << frames_since_last_second << std::endl;
-            frames_since_last_second = 0;
-        }
-
         if(const auto relative_mouse_position = mouse_position; left_click) {
-            auto screen_position = window.getView().getCenter() - sf::Vector2f(window.getSize()) / 2.0f;
-            auto absolute_mouse_position = screen_position + sf::Vector2f(*relative_mouse_position);
+            auto screen_position = window.getView().getCenter() - sf::Vector2f(window.getSize()) / 2.0f * zoom_factor;
+            auto absolute_mouse_position = screen_position + sf::Vector2f(*relative_mouse_position) * zoom_factor;
             auto clamped_mouse_position = clampPoint(absolute_mouse_position, game_map->getInnerArena());
             troops->walkTowards(clamped_mouse_position);
         } else {
@@ -136,8 +135,10 @@ private:
 
         game_map->updateCollisions();
 
-        if(!troops->isEmpty())
-            window.setView({troops->getAveragePosition(), sf::Vector2f(window.getSize()) * zoom_factor});
+        window.setView({
+            troops->isEmpty() ? window.getView().getCenter() : troops->getAveragePosition(), 
+            sf::Vector2f(window.getSize()) * zoom_factor
+        });
 
         window.clear(sf::Color::Black);
         game_map->draw(window);

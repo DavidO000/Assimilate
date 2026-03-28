@@ -422,7 +422,7 @@ void Gang::removeDeadTroops() {
 }
 
 void Gang::moveAllEntities(std::shared_ptr<Gang> to) {
-    for(auto &entity: entities) {
+    for(const auto &entity: entities) {
         entity->health = entity->getInitialHealth();
         entity->gang = to;
         entity->sprite.setTexture(entity->textures.getAlive(to->team));
@@ -540,13 +540,11 @@ ChunkIterator GameMap::iterateChunksInRadius(const sf::Vector2f position, const 
 
 void GameMap::updateCollisions() {
     static constexpr unsigned MaxCollisionIterations = 10;
-    static constexpr float MinSquabblingCutoff = 10.0;
     for(unsigned i = 0; i < MaxCollisionIterations; i++) {
         float squabbling = 0.0f;
         for(auto &entity: all_entities_cache) {
             squabbling += entity->updateCollision();
         }
-        if(squabbling < MinSquabblingCutoff) break;
     }
 }
 
