@@ -1,9 +1,20 @@
 #include <SFML/Graphics.hpp>
 #include "troops.cpp"
 
+enum class GameState {
+    Start,
+    Playing,
+    Paused,
+    Over,
+};
+
 class Game {
     sf::RenderWindow window;
+    std::optional<sf::Vector2u> last_window_size;
     sf::Clock clock;
+
+    GameState game_state;
+
     float time_since_started;
     float time_since_last_spawn;
     float time_until_next_spawn;
@@ -21,14 +32,22 @@ class Game {
     std::shared_ptr<Gang> troops;
 
     sf::Sprite grave;
+    sf::Sprite start_sign;
+    sf::Sprite paused_sign;
+    sf::Sprite over_sign;
 
+    static constexpr char GameName[] = "Assimilate";
 public:
     Game(): 
-        window(sf::RenderWindow(sf::VideoMode({800, 600}), "Assimilate")),
+        window(sf::RenderWindow(sf::VideoMode({800, 600}), GameName)),
+        game_state(GameState::Start),
         time_since_started(0.0f), time_since_last_spawn(0.0f), time_until_next_spawn(0.0f),
         time_since_last_second(0.0f), frames_since_last_second(0),
         left_click(false), zoom_factor(1.0f),
-        grave(sf::Sprite(entity_builder.getGrave()))
+        grave(sf::Sprite(entity_builder.getGrave())),
+        start_sign(sf::Sprite(entity_builder.getStartSign())),
+        paused_sign(sf::Sprite(entity_builder.getPausedSign())),
+        over_sign(sf::Sprite(entity_builder.getOverSign()))
     {
         constexpr sf::Vector2f inner_arena_size = {5000.0f, 5000.0f};
         const sf::Rect<float> inner_arena(-inner_arena_size / 2.0f, inner_arena_size);
@@ -41,56 +60,14 @@ public:
         const sf::Vector2f chunk_size = {100.0f, 100.0f};
         const sf::Vector2u chunks((outer_arena.getSize() + chunk_size).componentWiseDiv(chunk_size));
         game_map = std::make_shared<GameMap>(chunk_size, chunks, inner_arena, outer_arena);
-
-        troops = std::make_shared<Gang>(game_map, Team::Player);
-        for(unsigned i = 0; i < 100; i++) {
-            auto ptr = std::make_unique<Grunt>(entity_builder);
-            Gang::addEntity(troops, std::move(ptr));
-        }
-
-        for(unsigned i = 0; i < 5; i++) {
-            auto gang = std::make_shared<Gang>(game_map, Team::Enemy);
-            unsigned amount = rand() % 5 + 1;
-            for(unsigned j = 0; j < amount; j++) {
-                auto ptr = std::make_unique<Grunt>(entity_builder);
-                Gang::addEntity(gang, std::move(ptr));
-            }
-            gangs.push_back(gang);
-        }
     }
 
     friend std::ostream& operator<<(std::ostream& out, const Game &game);
 
 private:
-    void update() {
-        while(const std::optional event = window.pollEvent()) {
-            if (event->is<sf::Event::Closed>()) {
-                window.close();
-            } else if(const auto mouse_scrolled_event = event->getIf<sf::Event::MouseWheelScrolled>()) {
-                zoom_factor = std::clamp(zoom_factor + mouse_scrolled_event->delta, 0.5f, 10.0f);
-            } else if(const auto mouse_pressed_event = event->getIf<sf::Event::MouseButtonPressed>()) {
-                if(mouse_pressed_event->button == sf::Mouse::Button::Left) left_click = true;
-            } else if(const auto mouse_released_event = event->getIf<sf::Event::MouseButtonReleased>()) {
-                if(mouse_released_event->button == sf::Mouse::Button::Left) left_click = false;
-                if(mouse_released_event->button == sf::Mouse::Button::Right) {
-                    for(unsigned i = 0; i < gangs.size();) {
-                        if(gangs[i]->getGravePosition().has_value()) {
-                            gangs[i]->moveAllEntities(troops);
-                            std::swap(gangs[i], gangs[gangs.size() - 1]);
-                            gangs.pop_back();
-                        } else {
-                            i++;
-                        }
-                    }
-                }
+    static constexpr float MaximumTPS = 60.0f;
 
-            } else if(const auto mouse_moved_event = event->getIf<sf::Event::MouseMoved>()) {
-                mouse_position = mouse_moved_event->position;
-            } else if(event->is<sf::Event::MouseLeft>()) {
-                mouse_position = {};
-            }
-        }
-
+    float getDeltaTime() {
         float real_dt = clock.restart().asSeconds();
         time_since_last_second += real_dt;
         frames_since_last_second++;
@@ -99,8 +76,86 @@ private:
             std::cout << "fps: " << frames_since_last_second << std::endl;
             frames_since_last_second = 0;
         }
+        return std::min(real_dt, 1.0f / MaximumTPS);
+    }
 
-        float dt = std::min(real_dt, 1.0f / 60.0f);
+    void resetMap() {
+        game_map->reset();
+
+        troops = std::make_shared<Gang>(game_map, Team::Player);
+        for(unsigned i = 0; i < 5; i++) {
+            auto ptr = std::make_unique<Grunt>(entity_builder);
+            Gang::addEntity(troops, std::move(ptr));
+        }
+
+        gangs.clear();
+        for(unsigned i = 0; i < 5; i++) {
+            auto gang = std::make_shared<Gang>(game_map, Team::Enemy);
+            unsigned amount = rand() % 5 + 1;
+                for(unsigned j = 0; j < amount; j++) {
+                auto ptr = std::make_unique<Grunt>(entity_builder);
+                Gang::addEntity(gang, std::move(ptr));
+            }
+            gangs.push_back(gang);
+        }
+    }
+
+    void reanimateGangs() {
+        for(unsigned i = 0; i < gangs.size();) {
+            if(gangs[i]->getGravePosition().has_value()) {
+                gangs[i]->moveAllEntities(troops);
+                std::swap(gangs[i], gangs[gangs.size() - 1]);
+                gangs.pop_back();
+            } else {
+                i++;
+            }
+        }
+    }
+
+    void handleInput() {
+        while(const std::optional event = window.pollEvent()) {
+            if(event->is<sf::Event::Closed>()) {
+                window.close();
+            } else if(event->is<sf::Event::FocusLost>()) {
+                if(game_state == GameState::Playing) game_state = GameState::Paused;
+
+            } else if(const auto mouse_scrolled_event = event->getIf<sf::Event::MouseWheelScrolled>()) {
+                zoom_factor = std::clamp(zoom_factor + mouse_scrolled_event->delta, 0.5f, 10.0f);
+            } else if(const auto mouse_pressed_event = event->getIf<sf::Event::MouseButtonPressed>()) {
+                if(mouse_pressed_event->button == sf::Mouse::Button::Left) left_click = true;
+            } else if(const auto mouse_released_event = event->getIf<sf::Event::MouseButtonReleased>()) {
+                if(mouse_released_event->button == sf::Mouse::Button::Left) left_click = false;
+                else if(mouse_released_event->button == sf::Mouse::Button::Right 
+                    && game_state == GameState::Playing) reanimateGangs();
+            } else if(const auto mouse_moved_event = event->getIf<sf::Event::MouseMoved>()) {
+                mouse_position = mouse_moved_event->position;
+            } else if(event->is<sf::Event::MouseLeft>()) {
+                mouse_position = {};
+
+            } else if(const auto key_event = event->getIf<sf::Event::KeyPressed>()) {
+                if(key_event->code == sf::Keyboard::Key::F11) {
+                    if(const auto window_size = last_window_size) {
+                        window.create(sf::VideoMode(*window_size), GameName);
+                        last_window_size = {};
+                    } else {
+                        last_window_size = window.getSize();
+                        window.create(sf::VideoMode::getDesktopMode(), GameName, sf::Style::None);
+                    }
+                    
+                } if(key_event->code == sf::Keyboard::Key::Escape) {
+                    if(game_state == GameState::Playing) game_state = GameState::Paused;
+                    else if(game_state == GameState::Paused) game_state = GameState::Playing;
+                } else if(key_event->code == sf::Keyboard::Key::Enter) {
+                    if(game_state == GameState::Start || game_state == GameState::Over) {
+                        resetMap();
+                        game_state = GameState::Playing;
+                    }
+                }
+            }
+        }
+    }
+
+    void handleSpawning(const float dt) {
         time_since_last_spawn += dt;
         time_since_started += dt;
         if(time_since_last_spawn > time_until_next_spawn) {
@@ -116,10 +171,11 @@ private:
                 gangs.push_back(gang);
             }
         }
+    }
 
+    void updateEntities(const float dt) {
         if(const auto relative_mouse_position = mouse_position; left_click) {
-            auto screen_position = window.getView().getCenter() - sf::Vector2f(window.getSize()) / 2.0f * zoom_factor;
-            auto absolute_mouse_position = screen_position + sf::Vector2f(*relative_mouse_position) * zoom_factor;
+            auto absolute_mouse_position = window.mapPixelToCoords(*relative_mouse_position);
             auto clamped_mouse_position = clampPoint(absolute_mouse_position, game_map->getInnerArena());
             troops->walkTowards(clamped_mouse_position);
         } else {
@@ -127,14 +183,29 @@ private:
         }
 
         // Aggro loss before updates as to not have targets be dead/possibly dissapearing troops
-        troops->updateAggroLoss();
         for(const auto &gang: gangs) gang->updateAggroLoss();
+        troops->updateAggroLoss();
 
-        troops->update(dt);
+        // First you have the enemies attack, then you have the troops potentially be removed 
         for(const auto &gang: gangs) gang->update(dt);
+        troops->update(dt);
 
         game_map->updateMovement();
 
+        if(troops->isEmpty()) game_state = GameState::Over;
+    }
+
+    void drawStart() {
+        static constexpr sf::Color Brown(188,106,60);
+        window.setView({sf::Vector2f(window.getSize()) / 2.0f, sf::Vector2f(window.getSize())});
+
+        window.clear(Brown);
+        start_sign.setPosition(sf::Vector2f(window.getSize() - start_sign.getTexture().getSize()) / 2.0f);
+        window.draw(start_sign);
+        window.display();
+    }
+
+    void drawInGame() {
         window.setView({
             troops->isEmpty() ? window.getView().getCenter() : troops->getAveragePosition(), 
             sf::Vector2f(window.getSize()) * zoom_factor
@@ -148,7 +219,43 @@ private:
                 window.draw(grave);
             }
         }
+
+        if(game_state == GameState::Paused || game_state == GameState::Over) {
+            const auto old_view = window.getView(); 
+            window.setView({sf::Vector2f(window.getSize()) / 2.0f, sf::Vector2f(window.getSize())});
+
+            sf::RectangleShape overlay(sf::Vector2f(window.getSize()));
+            overlay.setFillColor(sf::Color(0, 0, 0, 64));
+            window.draw(overlay);
+
+            if(game_state == GameState::Paused) {
+                paused_sign.setPosition(sf::Vector2f(window.getSize() - paused_sign.getTexture().getSize()) / 2.0f);
+                window.draw(paused_sign);
+            } else if(game_state == GameState::Over) {
+                over_sign.setPosition(sf::Vector2f(window.getSize() - over_sign.getTexture().getSize()) / 2.0f);
+                window.draw(over_sign);
+            }
+
+            window.setView(old_view);
+        }
+
         window.display();
+    }
+
+    void update() {
+        float dt = getDeltaTime();
+        handleInput();
+
+        if(game_state == GameState::Playing || game_state == GameState::Over) {
+            if(game_state == GameState::Playing) handleSpawning(dt);
+            updateEntities(dt);
+        }
+
+        if(game_state == GameState::Start) {
+            drawStart();
+        } else {
+            drawInGame();
+        }
     }
 
 public:

@@ -24,7 +24,6 @@ class Entity {
     float radius;
 
     sf::Vector2f to_move;
-    sf::Vector2f to_separate;
 
     float wobble_position;
     float wobble_amplitude;
@@ -73,6 +72,7 @@ protected:
 
 private:
     void setDirection(const Direction direction);
+    void setTexture(const sf::Texture &texture);
     void progressWobble(const float desired_amplitude, const float speed, const float dt);
 
     // ChunkIterator iterateOverChunks();
@@ -191,6 +191,7 @@ private:
     ChunkIterator iterateChunksInRadius(const sf::Vector2f position, const float radius);
 
 public:
+    void reset();
     void updateMovement();
     void draw(sf::RenderWindow &window);
 };

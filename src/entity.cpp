@@ -11,7 +11,7 @@ Entity::Entity(const EntityTextures &textures):
     wobble_position(0.0f), wobble_amplitude(StandingWobbleAmplitude),
     gang(nullptr), target(nullptr), 
     health(0), time_since_attacked(0.0f),
-    time_since_revived(INFINITY), time_since_was_attacked(INFINITY) {}
+    time_since_revived(0.0f), time_since_was_attacked(INFINITY) {}
 
 Entity::~Entity() {
     removeFromChunks();
@@ -31,7 +31,7 @@ std::ostream& operator<<(std::ostream& out, const Entity &entity) {
 }
 
 sf::Vector2f Entity::getOrigin() const {
-    return sprite.getPosition() + sf::Vector2f(sprite.getTexture().getSize()).componentWiseMul({1.0, -1.0}) / 2.0f;
+    return sprite.getPosition() + sf::Vector2f(radius, -radius);
 }
 
 bool Entity::isDead() const {
@@ -42,7 +42,7 @@ void Entity::takeDamage(const unsigned amount) {
     health = subSat(health, amount);
     if(isDead()) {
         target = nullptr;
-        sprite.setTexture(textures.getDead());
+        setTexture(textures.getDead());
         sprite.setScale({1.0f, -1.0f});
         sprite.setColor(sf::Color::White);
 
@@ -84,13 +84,14 @@ void Entity::draw(sf::RenderWindow &window) const {
         window.draw(revive_triangle);
     }
 
-    const bool Debugging = true;
-    if(Debugging && target != nullptr) {
-        sf::RectangleShape rect({10.f, 10.0f});
-        rect.setFillColor(sf::Color::Green);
-        rect.setPosition(getOrigin());
-        window.draw(rect);
-    }
+    #ifndef NDEBUG
+        if(target != nullptr) {
+            sf::RectangleShape rect({10.f, 10.0f});
+            rect.setFillColor(sf::Color::Green);
+            rect.setPosition(getOrigin());
+            window.draw(rect);
+        }
+    #endif
 }
 
 Entity* Entity::getTarget() {
@@ -112,6 +113,11 @@ void Entity::setDirection(const Direction direction) {
     }
 }
 
+void Entity::setTexture(const sf::Texture &texture) {
+    sprite.setTexture(texture);
+    setDirection(sprite.getTextureRect().size.x > 0 ? Direction::Left : Direction::Right);
+}
+
 void Entity::progressWobble(const float desired_amplitude, const float speed, const float dt) {
     wobble_position += speed * dt;
     wobble_amplitude += (desired_amplitude - wobble_amplitude) * std::clamp(dt, 0.0f, 1.0f);
@@ -119,14 +125,14 @@ void Entity::progressWobble(const float desired_amplitude, const float speed, co
 }
 
 void Entity::addToChunks() {
-    auto iterator = gang->game_map->iterateChunksInRadius(sprite.getPosition(), radius);
+    auto iterator = gang->game_map->iterateChunksInRadius(getOrigin(), radius);
     while(auto chunk = iterator.next()) {
         chunk->push_back(this);
     }
 }
 
 void Entity::removeFromChunks() {
-    auto iterator = gang->game_map->iterateChunksInRadius(sprite.getPosition(), radius);
+    auto iterator = gang->game_map->iterateChunksInRadius(getOrigin(), radius);
     while(auto chunk = iterator.next()) {
         if(!removeFromVector(chunk, this)) {
             std::cerr << "Chunk invariance not upheld." << std::endl;
@@ -135,7 +141,7 @@ void Entity::removeFromChunks() {
 }
 
 void Entity::searchAggro(const float search_radius) {
-    auto iterator = gang->game_map->iterateChunksInRadius(sprite.getPosition(), search_radius);
+    auto iterator = gang->game_map->iterateChunksInRadius(getOrigin(), search_radius);
     while(auto chunk = iterator.next()) {
         for(unsigned i = 0; i < chunk->size(); i++) {
             const auto other = chunk->at(i);
@@ -318,7 +324,7 @@ void Gang::addEntity(std::shared_ptr<Gang> gang, std::unique_ptr<Entity> entity)
     entity->health = entity->getInitialHealth();
     entity->radius = entity->getRadius();
 
-    entity->sprite.setTexture(entity->textures.getAlive(gang->team));
+    entity->setTexture(entity->textures.getAlive(gang->team));
     entity->sprite.setPosition(clampPoint(gang->spawn_position, gang->game_map->getBoundry()));
 
     entity->addToChunks();
@@ -392,7 +398,7 @@ void Gang::moveAllEntities(std::shared_ptr<Gang> to) {
     for(const auto &entity: entities) {
         entity->health = entity->getInitialHealth();
         entity->gang = to;
-        entity->sprite.setTexture(entity->textures.getAlive(to->team));
+        entity->setTexture(entity->textures.getAlive(to->team));
         entity->time_since_was_attacked = INFINITY;
         entity->time_since_revived = 0.0f;
     }
@@ -505,6 +511,10 @@ ChunkIterator GameMap::iterateChunksInRadius(const sf::Vector2f position, const 
     return ChunkIterator(*this, start, end);
 }
 
+void GameMap::reset() {
+    all_entities_cache.clear();
+}
+
 void GameMap::updateMovement() {
 
     struct CollisionPair {
@@ -515,7 +525,7 @@ void GameMap::updateMovement() {
 
     for(auto &entity: all_entities_cache) {
         if(entity->isDead()) continue;
-        auto iterator = iterateChunksInRadius(entity->sprite.getPosition(), entity->radius);
+        auto iterator = iterateChunksInRadius(entity->getOrigin(), entity->radius);
         while(const auto chunk = iterator.next()) {
             for(auto other : *chunk) {
                 if(other <= entity || other->isDead()) continue;
@@ -559,7 +569,7 @@ void GameMap::draw(sf::RenderWindow &window) {
         [](const Entity *x, const Entity *y) {
             if(x->isDead() && !y->isDead()) return true;
             if(!x->isDead() && y->isDead()) return false;
-            return x->getOrigin().y < y->getOrigin().y; 
+            return x->sprite.getPosition().y < y->sprite.getPosition().y; 
         });
     for(const Entity *entity: all_entities_cache) {
         entity->draw(window);

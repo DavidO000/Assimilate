@@ -46,16 +46,28 @@ public:
 };
 
 class EntityBuilder {
+    sf::Texture start_sign;
+    sf::Texture paused_sign;
+    sf::Texture over_sign;
     sf::Texture arena;
     sf::Texture grave;
+
     EntityTextures grunt;
 
 public:
     EntityBuilder() {
-        if(!grave.loadFromFile("assets/gravestone.png")) std::cerr << "Could not load texture!" << std::endl;
+        if(!start_sign.loadFromFile("assets/start_sign.png")) std::cerr << "Could not load texture!" << std::endl;
+        if(!paused_sign.loadFromFile("assets/paused_sign.png")) std::cerr << "Could not load texture!" << std::endl;
+        if(!over_sign.loadFromFile("assets/over_sign.png")) std::cerr << "Could not load texture!" << std::endl;
         if(!arena.loadFromFile("assets/arena.png")) std::cerr << "Could not load texture!" << std::endl;
+        if(!grave.loadFromFile("assets/gravestone.png")) std::cerr << "Could not load texture!" << std::endl;
+
         if(!grunt.player.loadFromFile("assets/player_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
-        if(!grunt.enemy.loadFromFile("assets/enemy_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
+        #ifdef NDEBUG
+            if(!grunt.enemy.loadFromFile("assets/enemy_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
+        #else
+            if(!grunt.enemy.loadFromFile("assets/enemy_grunt_long.png")) std::cerr << "Could not load texture!" << std::endl;
+        #endif
         if(!grunt.dead.loadFromFile("assets/dead_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
     }
 
@@ -70,8 +82,11 @@ public:
         return out;
     }
 
-    const sf::Texture &getGrave() const { return grave; }
+    const sf::Texture &getStartSign() const { return start_sign; }
+    const sf::Texture &getPausedSign() const { return paused_sign; }
+    const sf::Texture &getOverSign() const { return over_sign; }
     const sf::Texture &getArena() const { return arena; }
+    const sf::Texture &getGrave() const { return grave; }
 
     const EntityTextures &getGrunt() const { return grunt; }
 };
