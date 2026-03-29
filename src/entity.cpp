@@ -6,8 +6,8 @@
 #include <SFML/Graphics.hpp>
 #include "entity.hpp"
 
-Entity::Entity(const EntityTextures &textures):
-    textures(textures), sprite(textures.getDead()), radius(0.0f),
+Entity::Entity(const EntityTextures &textures_):
+    textures(textures_), sprite(textures.getDead()), radius(0.0f),
     wobble_position(0.0f), wobble_amplitude(StandingWobbleAmplitude),
     gang(nullptr), target(nullptr), 
     health(0), time_since_attacked(0.0f),

@@ -1,19 +1,12 @@
 #include <SFML/Graphics.hpp>
 #include "troops.cpp"
-
-enum class GameState {
-    Start,
-    Playing,
-    Paused,
-    Over,
-};
+#include "overlay.cpp"
 
 class Game {
     sf::RenderWindow window;
-    std::optional<sf::Vector2u> last_window_size;
+    struct WindowData { sf::Vector2u size; sf::Vector2i position; };
+    std::optional<WindowData> last_window_data;
     sf::Clock clock;
-
-    GameState game_state;
 
     float time_since_started;
     float time_since_last_spawn;
@@ -32,22 +25,23 @@ class Game {
     std::shared_ptr<Gang> troops;
 
     sf::Sprite grave;
-    sf::Sprite start_sign;
-    sf::Sprite paused_sign;
-    sf::Sprite over_sign;
+    Overlay start_overlay;
+    Overlay paused_overlay;
+    Overlay over_overlay;
 
     static constexpr char GameName[] = "Assimilate";
 public:
+    static constexpr sf::Color Brown = sf::Color(188, 106, 60, 255);
+    static constexpr sf::Color Gray = sf::Color(0, 0, 0, 64);
     Game(): 
         window(sf::RenderWindow(sf::VideoMode({800, 600}), GameName)),
-        game_state(GameState::Start),
+        start_overlay {sf::Sprite(entity_builder.getStartSign()), Brown, OverlayOrder::Coming, INFINITY},
+        paused_overlay {sf::Sprite(entity_builder.getPausedSign()), Gray, OverlayOrder::Going, INFINITY},
+        over_overlay {sf::Sprite(entity_builder.getOverSign()), Gray, OverlayOrder::Going, INFINITY},
         time_since_started(0.0f), time_since_last_spawn(0.0f), time_until_next_spawn(0.0f),
         time_since_last_second(0.0f), frames_since_last_second(0),
         left_click(false), zoom_factor(1.0f),
-        grave(sf::Sprite(entity_builder.getGrave())),
-        start_sign(sf::Sprite(entity_builder.getStartSign())),
-        paused_sign(sf::Sprite(entity_builder.getPausedSign())),
-        over_sign(sf::Sprite(entity_builder.getOverSign()))
+        grave(sf::Sprite(entity_builder.getGrave()))
     {
         constexpr sf::Vector2f inner_arena_size = {5000.0f, 5000.0f};
         const sf::Rect<float> inner_arena(-inner_arena_size / 2.0f, inner_arena_size);
@@ -65,8 +59,9 @@ public:
     friend std::ostream& operator<<(std::ostream& out, const Game &game);
 
 private:
-    static constexpr float MaximumTPS = 60.0f;
+    #define Overlays {std::ref(start_overlay), std::ref(paused_overlay), std::ref(over_overlay)}
 
+    static constexpr float MaximumTPS = 60.0f;
     float getDeltaTime() {
         float real_dt = clock.restart().asSeconds();
         time_since_last_second += real_dt;
@@ -76,6 +71,11 @@ private:
             std::cout << "fps: " << frames_since_last_second << std::endl;
             frames_since_last_second = 0;
         }
+
+        for(auto overlay: Overlays) {
+            overlay.get().since += real_dt;
+        }
+
         return std::min(real_dt, 1.0f / MaximumTPS);
     }
 
@@ -83,7 +83,7 @@ private:
         game_map->reset();
 
         troops = std::make_shared<Gang>(game_map, Team::Player);
-        for(unsigned i = 0; i < 5; i++) {
+        for(unsigned i = 0; i < 1; i++) {
             auto ptr = std::make_unique<Grunt>(entity_builder);
             Gang::addEntity(troops, std::move(ptr));
         }
@@ -112,21 +112,28 @@ private:
         }
     }
 
+    bool isPlaying() {
+        for(auto overlay: Overlays) {
+            if(overlay.get().order == OverlayOrder::Coming) return false;
+        }
+        return true;
+    }
+
     void handleInput() {
         while(const std::optional event = window.pollEvent()) {
             if(event->is<sf::Event::Closed>()) {
                 window.close();
             } else if(event->is<sf::Event::FocusLost>()) {
-                if(game_state == GameState::Playing) game_state = GameState::Paused;
+                if(isPlaying()) paused_overlay.set();
 
             } else if(const auto mouse_scrolled_event = event->getIf<sf::Event::MouseWheelScrolled>()) {
-                zoom_factor = std::clamp(zoom_factor + mouse_scrolled_event->delta, 0.5f, 10.0f);
+                if(!start_overlay.isIn())
+                    zoom_factor = std::clamp(zoom_factor + mouse_scrolled_event->delta, 0.5f, 10.0f);
             } else if(const auto mouse_pressed_event = event->getIf<sf::Event::MouseButtonPressed>()) {
                 if(mouse_pressed_event->button == sf::Mouse::Button::Left) left_click = true;
             } else if(const auto mouse_released_event = event->getIf<sf::Event::MouseButtonReleased>()) {
                 if(mouse_released_event->button == sf::Mouse::Button::Left) left_click = false;
-                else if(mouse_released_event->button == sf::Mouse::Button::Right 
-                    && game_state == GameState::Playing) reanimateGangs();
+                else if(mouse_released_event->button == sf::Mouse::Button::Right && isPlaying()) reanimateGangs();
             } else if(const auto mouse_moved_event = event->getIf<sf::Event::MouseMoved>()) {
                 mouse_position = mouse_moved_event->position;
             } else if(event->is<sf::Event::MouseLeft>()) {
@@ -134,21 +141,26 @@ private:
 
             } else if(const auto key_event = event->getIf<sf::Event::KeyPressed>()) {
                 if(key_event->code == sf::Keyboard::Key::F11) {
-                    if(const auto window_size = last_window_size) {
-                        window.create(sf::VideoMode(*window_size), GameName);
-                        last_window_size = {};
+                    if(const auto window_data = last_window_data) {
+                        window.create(sf::VideoMode(window_data->size), GameName);
+                        window.setPosition(window_data->position);
+                        last_window_data = {};
                     } else {
-                        last_window_size = window.getSize();
+                        last_window_data = {window.getSize(), window.getPosition()};
                         window.create(sf::VideoMode::getDesktopMode(), GameName, sf::Style::None);
                     }
                     
                 } if(key_event->code == sf::Keyboard::Key::Escape) {
-                    if(game_state == GameState::Playing) game_state = GameState::Paused;
-                    else if(game_state == GameState::Paused) game_state = GameState::Playing;
+                    if(isPlaying()) paused_overlay.set();
+                    else if(paused_overlay.isIn()) paused_overlay.remove();
                 } else if(key_event->code == sf::Keyboard::Key::Enter) {
-                    if(game_state == GameState::Start || game_state == GameState::Over) {
+                    if(start_overlay.isIn()) {
                         resetMap();
-                        game_state = GameState::Playing;
+                        start_overlay.remove();
+                    }
+                    if(over_overlay.isIn()) {
+                        resetMap();
+                        over_overlay.remove();
                     }
                 }
             }
@@ -192,52 +204,46 @@ private:
 
         game_map->updateMovement();
 
-        if(troops->isEmpty()) game_state = GameState::Over;
+        if(troops->isEmpty() && !over_overlay.isIn()) over_overlay.set();
     }
 
-    void drawStart() {
-        static constexpr sf::Color Brown(188,106,60);
+    void draw() {
+        if(!start_overlay.isIn()) {
+            window.setView({
+                troops->isEmpty() ? window.getView().getCenter() : troops->getAveragePosition(), 
+                sf::Vector2f(window.getSize()) * zoom_factor
+            });
+
+            window.clear(sf::Color::Black);
+            game_map->draw(window);
+            for(const auto &gang: gangs) {
+                if(auto grave_position = gang->getGravePosition()) {
+                    grave.setPosition(*grave_position - sf::Vector2f(grave.getTexture().getSize()) / 2.0f);
+                    window.draw(grave);
+                }
+            }
+        }
+
+        auto old_view = window.getView();
         window.setView({sf::Vector2f(window.getSize()) / 2.0f, sf::Vector2f(window.getSize())});
 
-        window.clear(Brown);
-        start_sign.setPosition(sf::Vector2f(window.getSize() - start_sign.getTexture().getSize()) / 2.0f);
-        window.draw(start_sign);
-        window.display();
-    }
-
-    void drawInGame() {
-        window.setView({
-            troops->isEmpty() ? window.getView().getCenter() : troops->getAveragePosition(), 
-            sf::Vector2f(window.getSize()) * zoom_factor
-        });
-
-        window.clear(sf::Color::Black);
-        game_map->draw(window);
-        for(const auto &gang: gangs) {
-            if(auto grave_position = gang->getGravePosition()) {
-                grave.setPosition(*grave_position - sf::Vector2f(grave.getTexture().getSize()) / 2.0f);
-                window.draw(grave);
-            }
-        }
-
-        if(game_state == GameState::Paused || game_state == GameState::Over) {
-            const auto old_view = window.getView(); 
-            window.setView({sf::Vector2f(window.getSize()) / 2.0f, sf::Vector2f(window.getSize())});
+        for(auto overlay_data_ref: Overlays) {
+            auto &overlay_data = overlay_data_ref.get();
+            float since = std::clamp(overlay_data.since, 0.0f, SecondsToPutOverlay) / SecondsToPutOverlay;
+            float drop_down_height = overlay_data.order == OverlayOrder::Coming ? since - 1.0f: -since;
+            sf::Vector2f drop_down(0.0f, float(window.getSize().y) * drop_down_height);
 
             sf::RectangleShape overlay(sf::Vector2f(window.getSize()));
-            overlay.setFillColor(sf::Color(0, 0, 0, 64));
+            overlay.setPosition(drop_down);
+            overlay.setFillColor(overlay_data.background_color);
             window.draw(overlay);
 
-            if(game_state == GameState::Paused) {
-                paused_sign.setPosition(sf::Vector2f(window.getSize() - paused_sign.getTexture().getSize()) / 2.0f);
-                window.draw(paused_sign);
-            } else if(game_state == GameState::Over) {
-                over_sign.setPosition(sf::Vector2f(window.getSize() - over_sign.getTexture().getSize()) / 2.0f);
-                window.draw(over_sign);
-            }
-
-            window.setView(old_view);
+            sf::Vector2f sign_location = sf::Vector2f(window.getSize() - overlay_data.sign.getTexture().getSize()) / 2.0f;
+            overlay_data.sign.setPosition(sign_location + drop_down);
+            window.draw(overlay_data.sign);
         }
+
+        window.setView(old_view);
 
         window.display();
     }
@@ -246,16 +252,12 @@ private:
         float dt = getDeltaTime();
         handleInput();
 
-        if(game_state == GameState::Playing || game_state == GameState::Over) {
-            if(game_state == GameState::Playing) handleSpawning(dt);
+        if(isPlaying() || over_overlay.isIn()) {
+            if(isPlaying()) handleSpawning(dt);
             updateEntities(dt);
         }
 
-        if(game_state == GameState::Start) {
-            drawStart();
-        } else {
-            drawInGame();
-        }
+        draw();
     }
 
 public:
