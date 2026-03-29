@@ -35,13 +35,13 @@ public:
     static constexpr sf::Color Gray = sf::Color(0, 0, 0, 64);
     Game(): 
         window(sf::RenderWindow(sf::VideoMode({800, 600}), GameName)),
-        start_overlay {sf::Sprite(entity_builder.getStartSign()), Brown, OverlayOrder::Coming, INFINITY},
-        paused_overlay {sf::Sprite(entity_builder.getPausedSign()), Gray, OverlayOrder::Going, INFINITY},
-        over_overlay {sf::Sprite(entity_builder.getOverSign()), Gray, OverlayOrder::Going, INFINITY},
         time_since_started(0.0f), time_since_last_spawn(0.0f), time_until_next_spawn(0.0f),
         time_since_last_second(0.0f), frames_since_last_second(0),
         left_click(false), zoom_factor(1.0f),
-        grave(sf::Sprite(entity_builder.getGrave()))
+        grave(sf::Sprite(entity_builder.getGrave())),
+        start_overlay {sf::Sprite(entity_builder.getStartSign()), Brown, OverlayOrder::Coming, INFINITY},
+        paused_overlay {sf::Sprite(entity_builder.getPausedSign()), Gray, OverlayOrder::Going, INFINITY},
+        over_overlay {sf::Sprite(entity_builder.getOverSign()), Gray, OverlayOrder::Going, INFINITY}
     {
         constexpr sf::Vector2f inner_arena_size = {5000.0f, 5000.0f};
         const sf::Rect<float> inner_arena(-inner_arena_size / 2.0f, inner_arena_size);
