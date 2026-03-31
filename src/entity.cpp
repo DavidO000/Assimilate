@@ -10,7 +10,7 @@ Entity::Entity(const EntityTextures &textures_):
     textures(textures_), sprite(textures.getDead()), radius(0.0f),
     wobble_position(0.0f), wobble_amplitude(StandingWobbleAmplitude),
     gang(nullptr), target(nullptr), 
-    health(0), time_since_attacked(0.0f),
+    health(0), attack_counter(0.0f), time_since_attacked(INFINITY),
     time_since_revived(0.0f), time_since_was_attacked(INFINITY) {}
 
 Entity::~Entity() {
@@ -65,7 +65,7 @@ void Entity::takeDamage(const unsigned amount) {
 void Entity::takeKnockback(const sf::Vector2f from, const float amount) {
     const sf::Vector2f delta = getOrigin() - from;
     if(delta.length() == 0) return;
-    to_move += delta.normalized() * amount;
+    knocked_back += delta.normalized() * amount;
 }
 
 void Entity::draw(sf::RenderWindow &window) const {
@@ -171,10 +171,14 @@ void Entity::updateAggroLoss() {
         if(target->isDead()) {
             target = nullptr;
             searchAggro(getLoseAggroRadius());
+            if(target == nullptr) {
+                attack_counter = 0.0f;
+            }
         } else {
             const float distance_to_target = (getOrigin() - target->getOrigin()).length();
             if(distance_to_target > getLoseAggroRadius()) {
                 target = nullptr;
+                attack_counter = 0.0f;
             }
         }
     }
@@ -242,6 +246,13 @@ void Entity::update(const float dt) {
 
     time_since_revived += dt;
     time_since_was_attacked += dt;
+    time_since_attacked += dt;
+
+    if(time_since_attacked < getAttackDuration()) {
+        setTexture(textures.getAttack(gang->team));
+    } else {
+        setTexture(textures.getAlive(gang->team));
+    }
 
     if(time_since_was_attacked < 0.2) sprite.setColor(sf::Color(160, 160, 160));
     else sprite.setColor(sf::Color::White);
@@ -258,10 +269,14 @@ void Entity::update(const float dt) {
             walkTowards(target->getOrigin(), dt);
         }
         if(distance_to_target < getAttackRadius()) {
-            time_since_attacked += dt;
-            if(time_since_attacked > getAttackSpeed()) {
+            attack_counter += dt;
+            if(attack_counter > getAttackSpeed()) {
                 attack();
+                setTexture(textures.getAttack(gang->team));
+                attack_counter = 0.0f;
                 time_since_attacked = 0.0f;
+            } else if(attack_counter > getAttackSpeed() - getAttackPrepareDuration()) {
+                setTexture(textures.getPrepareAttack(gang->team));
             }
         }
     }
@@ -270,27 +285,7 @@ void Entity::update(const float dt) {
 
 
 sf::Vector2f Gang::makeSpawnPoint() const {
-    const sf::Rect<float> arena = game_map->getInnerArena();
-    const sf::Rect<float> spawnable_points[4] {
-        { // up
-            {arena.position.x, arena.position.y - OutsideSpawnWidth},
-            {arena.size.x, OutsideSpawnWidth}
-        },
-        { // left
-            {arena.position.x - OutsideSpawnWidth, arena.position.y},
-            {OutsideSpawnWidth, arena.size.y}
-        },
-        { // down
-            {arena.position.x, arena.position.y + arena.size.y},
-            {arena.size.x, OutsideSpawnWidth}
-        },
-        { // right
-            {arena.position.x + arena.size.x, arena.position.y},
-            {OutsideSpawnWidth, arena.size.y}
-        },
-    };
-
-    return getRandomRectPosition(spawnable_points[rand() % 4]);
+    return getRandomRectPosition(game_map->getSpawnRects()[rand() % 4]);
 }
 
 Gang::Gang(std::shared_ptr<GameMap> game_map, const Team team): 
@@ -373,7 +368,7 @@ void Gang::updateWondering(const float dt) {
 
     if(!move_info.to_wait.to_wait) {
         const float distance_from_destination = (getAveragePosition() - walk_towards).length();
-        if(distance_from_destination < OutsideSpawnWidth) {
+        if(distance_from_destination < GameMap::OutsideSpawnWidth) {
             move_info.to_wait.to_wait = true;
             move_info.to_wait.time_to_wait = float(rand() % 6 + 1);
             move_info.to_wait.time_since_arrived = 0.0f;
@@ -398,6 +393,8 @@ void Gang::moveAllEntities(std::shared_ptr<Gang> to) {
         entity->health = entity->getInitialHealth();
         entity->gang = to;
         entity->setTexture(entity->textures.getAlive(to->team));
+        entity->attack_counter = 0.0f;
+        entity->time_since_attacked = INFINITY;
         entity->time_since_was_attacked = INFINITY;
         entity->time_since_revived = 0.0f;
     }
@@ -485,6 +482,29 @@ sf::Rect<float> GameMap::getBoundry() const {
     return {-rectangle_size / 2.0f, rectangle_size - iota};
 }
 
+std::array<sf::Rect<float>, 4> GameMap::getSpawnRects() const {
+    const sf::Rect<float> arena = {outer_arena.getPosition(), outer_arena.getSize()};
+    std::array<sf::Rect<float>, 4> spawnable_points {{
+        { // up
+            {arena.position.x, arena.position.y},
+            {arena.size.x - OutsideSpawnWidth, OutsideSpawnWidth}
+        },
+        { // left
+            {arena.position.x, arena.position.y + OutsideSpawnWidth},
+            {OutsideSpawnWidth, arena.size.y - OutsideSpawnWidth}
+        },
+        { // down
+            {arena.position.x + OutsideSpawnWidth, arena.position.y + arena.size.y - OutsideSpawnWidth},
+            {arena.size.x - OutsideSpawnWidth, OutsideSpawnWidth}
+        },
+        { // right
+            {arena.position.x + arena.size.x - OutsideSpawnWidth, arena.position.y},
+            {OutsideSpawnWidth, arena.size.y - OutsideSpawnWidth}
+        },
+    }};
+    return spawnable_points;
+}
+
 sf::Vector2u GameMap::getIndex(const sf::Vector2f position) const {
     const sf::Vector2f middle_to_center = chunk_size.componentWiseMul(sf::Vector2f(chunk_amounts)) / 2.0f;
     const sf::Vector2u absolute_position(position + middle_to_center);
@@ -514,6 +534,7 @@ void GameMap::reset() {
     all_entities_cache.clear();
 }
 
+static constexpr float PerTickKnockbackRatio = 1.0f / 100.0f;
 void GameMap::updateMovement() {
 
     struct CollisionPair {
@@ -539,7 +560,8 @@ void GameMap::updateMovement() {
     for(unsigned i = 0; i < MaxCollisionIterations; i++) {
         for(auto &entity: all_entities_cache) {
             if(entity->isDead()) continue;
-            entity->sprite.move(entity->to_move / float(MaxCollisionIterations));
+            sf::Vector2f amount_to_move = entity->to_move + entity->knocked_back * PerTickKnockbackRatio;
+            entity->sprite.move(amount_to_move / float(MaxCollisionIterations));
         }
 
         for(auto &[entity, other]: pairs) {
@@ -557,6 +579,7 @@ void GameMap::updateMovement() {
 
     for(auto &entity: all_entities_cache) {
         entity->to_move = {0.0f, 0.0f};
+        entity->knocked_back -= entity->knocked_back * PerTickKnockbackRatio;
         if(entity->isDead()) continue;
         entity->addToChunks();
     }
@@ -564,6 +587,19 @@ void GameMap::updateMovement() {
 
 void GameMap::draw(sf::RenderWindow &window) {
     window.draw(outer_arena);
+    #ifndef NDEBUG
+        for(auto rect: getSpawnRects()) {
+            sf::RectangleShape rectshape(rect.size);
+            rectshape.setPosition(rect.position);
+            rectshape.setFillColor(sf::Color(255, 0, 0, 32));
+            window.draw(rectshape);
+        }
+        sf::RectangleShape rectshape(inner_arena.size);
+        rectshape.setPosition(inner_arena.position);
+        rectshape.setFillColor(sf::Color(255, 255, 255, 16));
+        window.draw(rectshape);
+        
+    #endif
     std::sort(all_entities_cache.begin(), all_entities_cache.end(), 
         [](const Entity *x, const Entity *y) {
             if(x->isDead() && !y->isDead()) return true;

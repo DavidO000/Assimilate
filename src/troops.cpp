@@ -14,8 +14,10 @@ public:
     float getAttackRadius() const override { return 150.0f; }
     float getPrefferedAttackRadius() const override { return 50.0f; }
     float getAttackSpeed() const override { return 1.0f; }
+    float getAttackPrepareDuration() const override { return 0.25f; }
+    float getAttackDuration() const override { return 0.25f; }
     void attack() override {
-        getTarget()->takeKnockback(getOrigin(), 10.0f);
+        getTarget()->takeKnockback(getOrigin(), 250.0f);
         getTarget()->takeDamage(30);
     }
 };

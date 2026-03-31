@@ -9,8 +9,8 @@ public:
     OverlayOrder order;
     float since;
 
-    Overlay(sf::Sprite sign_, sf::Color background_color_, OverlayOrder order_, float since_): 
-        sign(std::move(sign_)), background_color(background_color_), order(order_), since(since_) {}
+    Overlay(sf::Sprite sign_, sf::Color background_color_, OverlayOrder order_): 
+        sign(std::move(sign_)), background_color(background_color_), order(order_), since(INFINITY) {}
     Overlay(const Overlay&) = delete;
     Overlay& operator=(const Overlay&) = delete;
     Overlay(Overlay&&) = delete;

@@ -24,6 +24,7 @@ class Entity {
     float radius;
 
     sf::Vector2f to_move;
+    sf::Vector2f knocked_back;
 
     float wobble_position;
     float wobble_amplitude;
@@ -32,8 +33,8 @@ class Entity {
     Entity *target;
     
     unsigned health;
+    float attack_counter;
     float time_since_attacked;
-
     float time_since_revived;
     float time_since_was_attacked;
 
@@ -68,6 +69,8 @@ protected:
     virtual float getAttackRadius() const = 0;
     virtual float getPrefferedAttackRadius() const = 0;
     virtual float getAttackSpeed() const = 0;
+    virtual float getAttackPrepareDuration() const = 0;
+    virtual float getAttackDuration() const = 0;
     virtual void attack() = 0;
 
 private:
@@ -91,7 +94,6 @@ private:
 
 class Gang {
     friend class Entity;
-    static constexpr float OutsideSpawnWidth = 100.0f;
 
     const Team team;
     std::vector<std::unique_ptr<Entity>> entities;
@@ -162,6 +164,8 @@ class GameMap {
     friend class Gang;
     friend class ChunkIterator;
 
+    static constexpr float OutsideSpawnWidth = 100.0f;
+
     std::vector<Entity*> all_entities_cache;
     std::vector<std::vector<Entity*>> map;
     const sf::Vector2f chunk_size;
@@ -184,6 +188,7 @@ public:
 
     sf::Rect<float> getInnerArena() const;
     sf::Rect<float> getBoundry() const;
+    std::array<sf::Rect<float>, 4> getSpawnRects() const;
 
 private:
     sf::Vector2u getIndex(const sf::Vector2f position) const;

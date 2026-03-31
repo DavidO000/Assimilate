@@ -11,17 +11,56 @@ std::ostream& operator<<(std::ostream& out, const Team &team) {
     return out;
 }
 
+inline void setTexture(sf::Texture &texture, const char *dir_name) {
+    if(!texture.loadFromFile(dir_name)) 
+        std::cerr << "Could not load texture!" << std::endl;
+}
+
+inline void setTexture(sf::Texture &texture, std::string &dir_name, const char name[]) {
+    size_t regular_size = dir_name.size();
+    dir_name += name;
+    setTexture(texture, dir_name.c_str());
+    dir_name.resize(regular_size); 
+}
+
 class EntityTextures {
     friend class EntityBuilder;
 
     sf::Texture player;
+    sf::Texture player_prepare_attack;
+    sf::Texture player_attack;
     sf::Texture enemy;
+    sf::Texture enemy_prepare_attack;
+    sf::Texture enemy_attack;
     sf::Texture dead;
 
-    EntityTextures() = default; // requires 2 step initialisation
+    EntityTextures(std::string dir_name) {
+        setTexture(player, dir_name, "player.png");
+        setTexture(player_prepare_attack, dir_name, "player_prepare_attack.png");
+        setTexture(player_attack, dir_name, "player_attack.png");
+
+        #ifdef NDEBUG
+            setTexture(enemy, dir_name, "enemy.png");
+        #else
+            setTexture(enemy, dir_name, "enemy_long.png");
+        #endif
+        setTexture(enemy_prepare_attack, dir_name, "enemy_prepare_attack.png");
+        setTexture(enemy_attack, dir_name, "enemy_attack.png");
+
+        setTexture(dead, dir_name, "dead.png");
+    };
+
 public:
     const sf::Texture &getAlive(const Team team) const {
         return team == Team::Player ? player : enemy;
+    }
+
+    const sf::Texture &getPrepareAttack(const Team team) const {
+        return team == Team::Player ? player_prepare_attack : enemy_prepare_attack;
+    }
+
+    const sf::Texture &getAttack(const Team team) const {
+        return team == Team::Player ? player_attack : enemy_attack;
     }
 
     const sf::Texture &getDead() const {
@@ -55,20 +94,12 @@ class EntityBuilder {
     EntityTextures grunt;
 
 public:
-    EntityBuilder() {
-        if(!start_sign.loadFromFile("assets/start_sign.png")) std::cerr << "Could not load texture!" << std::endl;
-        if(!paused_sign.loadFromFile("assets/paused_sign.png")) std::cerr << "Could not load texture!" << std::endl;
-        if(!over_sign.loadFromFile("assets/over_sign.png")) std::cerr << "Could not load texture!" << std::endl;
-        if(!arena.loadFromFile("assets/arena.png")) std::cerr << "Could not load texture!" << std::endl;
-        if(!grave.loadFromFile("assets/gravestone.png")) std::cerr << "Could not load texture!" << std::endl;
-
-        if(!grunt.player.loadFromFile("assets/player_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
-        #ifdef NDEBUG
-            if(!grunt.enemy.loadFromFile("assets/enemy_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
-        #else
-            if(!grunt.enemy.loadFromFile("assets/enemy_grunt_long.png")) std::cerr << "Could not load texture!" << std::endl;
-        #endif
-        if(!grunt.dead.loadFromFile("assets/dead_grunt.png")) std::cerr << "Could not load texture!" << std::endl;
+    EntityBuilder(): grunt("assets/grunt/") {
+        setTexture(start_sign, "assets/start_sign.png");
+        setTexture(paused_sign, "assets/paused_sign.png");
+        setTexture(over_sign, "assets/over_sign.png");
+        setTexture(arena, "assets/arena.png");
+        setTexture(grave, "assets/gravestone.png");
     }
 
     // This object is expensive, and should never be copied implicitly!

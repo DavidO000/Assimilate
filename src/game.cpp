@@ -39,9 +39,9 @@ public:
         time_since_last_second(0.0f), frames_since_last_second(0),
         left_click(false), zoom_factor(1.0f),
         grave(sf::Sprite(entity_builder.getGrave())),
-        start_overlay {sf::Sprite(entity_builder.getStartSign()), Brown, OverlayOrder::Coming, INFINITY},
-        paused_overlay {sf::Sprite(entity_builder.getPausedSign()), Gray, OverlayOrder::Going, INFINITY},
-        over_overlay {sf::Sprite(entity_builder.getOverSign()), Gray, OverlayOrder::Going, INFINITY}
+        start_overlay { sf::Sprite(entity_builder.getStartSign()), Brown, OverlayOrder::Coming },
+        paused_overlay { sf::Sprite(entity_builder.getPausedSign()), Gray, OverlayOrder::Going },
+        over_overlay { sf::Sprite(entity_builder.getOverSign()), Gray, OverlayOrder::Going }
     {
         constexpr sf::Vector2f inner_arena_size = {5000.0f, 5000.0f};
         const sf::Rect<float> inner_arena(-inner_arena_size / 2.0f, inner_arena_size);
@@ -81,9 +81,10 @@ private:
 
     void resetMap() {
         game_map->reset();
+        time_since_started = 0.0f;
 
         troops = std::make_shared<Gang>(game_map, Team::Player);
-        for(unsigned i = 0; i < 1; i++) {
+        for(unsigned i = 0; i < 5; i++) {
             auto ptr = std::make_unique<Grunt>(entity_builder);
             Gang::addEntity(troops, std::move(ptr));
         }
@@ -119,6 +120,22 @@ private:
         return true;
     }
 
+    bool potentiallyStart() {
+        if(start_overlay.isIn()) {
+            resetMap();
+            start_overlay.remove();
+            return true;
+        } else if(over_overlay.isIn()) {
+            resetMap();
+            over_overlay.remove();
+            return true;
+        } else if(paused_overlay.isIn()) {
+            paused_overlay.remove();
+            return false;
+        } 
+        return false;
+    }
+
     void handleInput() {
         while(const std::optional event = window.pollEvent()) {
             if(event->is<sf::Event::Closed>()) {
@@ -130,7 +147,9 @@ private:
                 if(!start_overlay.isIn())
                     zoom_factor = std::clamp(zoom_factor + mouse_scrolled_event->delta, 0.5f, 10.0f);
             } else if(const auto mouse_pressed_event = event->getIf<sf::Event::MouseButtonPressed>()) {
-                if(mouse_pressed_event->button == sf::Mouse::Button::Left) left_click = true;
+                if(!potentiallyStart()) {
+                    if(mouse_pressed_event->button == sf::Mouse::Button::Left) left_click = true;
+                }
             } else if(const auto mouse_released_event = event->getIf<sf::Event::MouseButtonReleased>()) {
                 if(mouse_released_event->button == sf::Mouse::Button::Left) left_click = false;
                 else if(mouse_released_event->button == sf::Mouse::Button::Right && isPlaying()) reanimateGangs();
@@ -154,14 +173,9 @@ private:
                     if(isPlaying()) paused_overlay.set();
                     else if(paused_overlay.isIn()) paused_overlay.remove();
                 } else if(key_event->code == sf::Keyboard::Key::Enter) {
-                    if(start_overlay.isIn()) {
-                        resetMap();
-                        start_overlay.remove();
-                    }
-                    if(over_overlay.isIn()) {
-                        resetMap();
-                        over_overlay.remove();
-                    }
+                    potentiallyStart();
+                } else if(key_event->code == sf::Keyboard::Key::Space) {
+                    potentiallyStart();
                 }
             }
         }
@@ -175,7 +189,7 @@ private:
             time_until_next_spawn = rand() % 8 + 2;
             for(unsigned i = 0; i < 1; i++) {
                 auto gang = std::make_shared<Gang>(game_map, Team::Enemy);
-                unsigned amount = std::pow(time_since_started, 0.75) + 1;
+                unsigned amount = 2.0f * std::pow(time_since_started, 0.66) + 1;
                 for(unsigned j = 0; j < amount; j++) {
                     auto ptr = std::make_unique<Grunt>(entity_builder);
                     Gang::addEntity(gang, std::move(ptr));
