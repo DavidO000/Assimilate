@@ -3,7 +3,6 @@
 #include "overlay.cpp"
 
 class Game {
-    sf::RenderWindow window;
     struct WindowData { sf::Vector2u size; sf::Vector2i position; };
     std::optional<WindowData> last_window_data;
     sf::Clock clock;
@@ -21,28 +20,19 @@ class Game {
 
     const EntityBuilder entity_builder;
     std::shared_ptr<GameMap> game_map;
-    std::vector<std::shared_ptr<Gang>> gangs;
-    std::shared_ptr<Gang> troops;
+    std::vector<Gang> gangs;
+    Gang troops;
 
     sf::Sprite grave;
     Overlay start_overlay;
     Overlay paused_overlay;
     Overlay over_overlay;
+    // window at the end to be as close to updating as possible
+    sf::RenderWindow window;
 
     static constexpr char GameName[] = "Assimilate";
-public:
-    static constexpr sf::Color Brown = sf::Color(188, 106, 60, 255);
-    static constexpr sf::Color Gray = sf::Color(0, 0, 0, 64);
-    Game(): 
-        window(sf::RenderWindow(sf::VideoMode({800, 600}), GameName)),
-        time_since_started(0.0f), time_since_last_spawn(0.0f), time_until_next_spawn(0.0f),
-        time_since_last_second(0.0f), frames_since_last_second(0),
-        left_click(false), zoom_factor(1.0f),
-        grave(sf::Sprite(entity_builder.getGrave())),
-        start_overlay { sf::Sprite(entity_builder.getStartSign()), Brown, OverlayOrder::Coming },
-        paused_overlay { sf::Sprite(entity_builder.getPausedSign()), Gray, OverlayOrder::Going },
-        over_overlay { sf::Sprite(entity_builder.getOverSign()), Gray, OverlayOrder::Going }
-    {
+
+    std::shared_ptr<GameMap> makeGameMap() {
         constexpr sf::Vector2f inner_arena_size = {5000.0f, 5000.0f};
         const sf::Rect<float> inner_arena(-inner_arena_size / 2.0f, inner_arena_size);
 
@@ -53,7 +43,23 @@ public:
 
         const sf::Vector2f chunk_size = {100.0f, 100.0f};
         const sf::Vector2u chunks((outer_arena.getSize() + chunk_size).componentWiseDiv(chunk_size));
-        game_map = std::make_shared<GameMap>(chunk_size, chunks, inner_arena, outer_arena);
+        return std::make_shared<GameMap>(chunk_size, chunks, inner_arena, outer_arena);
+    }
+public:
+    static constexpr sf::Color Brown = sf::Color(188, 106, 60, 255);
+    static constexpr sf::Color Gray = sf::Color(0, 0, 0, 64);
+    Game():
+        time_since_started(0.0f), time_since_last_spawn(0.0f), time_until_next_spawn(0.0f),
+        time_since_last_second(0.0f), frames_since_last_second(0),
+        left_click(false), zoom_factor(1.0f),
+        game_map(makeGameMap()), troops(Gang(game_map, Team::Player)),
+        grave(sf::Sprite(entity_builder.getGrave())),
+        start_overlay { sf::Sprite(entity_builder.getStartSign()), Brown, OverlayOrder::Coming },
+        paused_overlay { sf::Sprite(entity_builder.getPausedSign()), Gray, OverlayOrder::Going },
+        over_overlay { sf::Sprite(entity_builder.getOverSign()), Gray, OverlayOrder::Going },
+        window(sf::RenderWindow(sf::VideoMode({800, 600}), GameName))
+    {
+        window.setVisible(false);
     }
 
     friend std::ostream& operator<<(std::ostream& out, const Game &game);
@@ -83,28 +89,28 @@ private:
         game_map->reset();
         time_since_started = 0.0f;
 
-        troops = std::make_shared<Gang>(game_map, Team::Player);
+        troops = Gang(game_map, Team::Player);
         for(unsigned i = 0; i < 5; i++) {
             auto ptr = std::make_unique<Grunt>(entity_builder);
-            Gang::addEntity(troops, std::move(ptr));
+            troops.addEntity(std::move(ptr));
         }
 
         gangs.clear();
         for(unsigned i = 0; i < 5; i++) {
-            auto gang = std::make_shared<Gang>(game_map, Team::Enemy);
+            Gang gang(game_map, Team::Enemy);
             unsigned amount = rand() % 5 + 1;
                 for(unsigned j = 0; j < amount; j++) {
                 auto ptr = std::make_unique<Grunt>(entity_builder);
-                Gang::addEntity(gang, std::move(ptr));
+                gang.addEntity(std::move(ptr));
             }
-            gangs.push_back(gang);
+            gangs.push_back(std::move(gang));
         }
     }
 
     void reanimateGangs() {
         for(unsigned i = 0; i < gangs.size();) {
-            if(gangs[i]->getGravePosition().has_value()) {
-                gangs[i]->moveAllEntities(troops);
+            if(gangs[i].getGravePosition().has_value()) {
+                gangs[i].moveAllEntities(troops);
                 std::swap(gangs[i], gangs[gangs.size() - 1]);
                 gangs.pop_back();
             } else {
@@ -132,7 +138,7 @@ private:
         } else if(paused_overlay.isIn()) {
             paused_overlay.remove();
             return false;
-        } 
+        }
         return false;
     }
 
@@ -188,13 +194,13 @@ private:
             time_since_last_spawn = 0.0f;
             time_until_next_spawn = rand() % 8 + 2;
             for(unsigned i = 0; i < 1; i++) {
-                auto gang = std::make_shared<Gang>(game_map, Team::Enemy);
+                Gang gang(game_map, Team::Enemy);
                 unsigned amount = 2.0f * std::pow(time_since_started, 0.66) + 1;
                 for(unsigned j = 0; j < amount; j++) {
                     auto ptr = std::make_unique<Grunt>(entity_builder);
-                    Gang::addEntity(gang, std::move(ptr));
+                    gang.addEntity(std::move(ptr));
                 }
-                gangs.push_back(gang);
+                gangs.push_back(std::move(gang));
             }
         }
     }
@@ -203,35 +209,36 @@ private:
         if(const auto relative_mouse_position = mouse_position; left_click) {
             auto absolute_mouse_position = window.mapPixelToCoords(*relative_mouse_position);
             auto clamped_mouse_position = clampPoint(absolute_mouse_position, game_map->getInnerArena());
-            troops->walkTowards(clamped_mouse_position);
+            troops.walkTowards(clamped_mouse_position);
         } else {
-            troops->stopWalking();
+            troops.stopWalking();
         }
 
         // Aggro loss before updates as to not have targets be dead/possibly dissapearing troops
-        for(const auto &gang: gangs) gang->updateAggroLoss();
-        troops->updateAggroLoss();
+        for(auto &gang: gangs) gang.updateAggroLoss();
+        troops.updateAggroLoss();
 
-        // First you have the enemies attack, then you have the troops potentially be removed 
-        for(const auto &gang: gangs) gang->update(dt);
-        troops->update(dt);
+        for(auto &gang: gangs) gang.update(dt);
+        troops.update(dt);
+
+        troops.removeDeadTroops();
 
         game_map->updateMovement();
 
-        if(troops->isEmpty() && !over_overlay.isIn()) over_overlay.set();
+        if(troops.isEmpty() && !over_overlay.isIn()) over_overlay.set();
     }
 
     void draw() {
         if(!start_overlay.isIn()) {
             window.setView({
-                troops->isEmpty() ? window.getView().getCenter() : troops->getAveragePosition(), 
+                troops.isEmpty() ? window.getView().getCenter() : troops.getAveragePosition(), 
                 sf::Vector2f(window.getSize()) * zoom_factor
             });
 
             window.clear(sf::Color::Black);
             game_map->draw(window);
             for(const auto &gang: gangs) {
-                if(auto grave_position = gang->getGravePosition()) {
+                if(auto grave_position = gang.getGravePosition()) {
                     grave.setPosition(*grave_position - sf::Vector2f(grave.getTexture().getSize()) / 2.0f);
                     window.draw(grave);
                 }
@@ -260,6 +267,7 @@ private:
         window.setView(old_view);
 
         window.display();
+        window.setVisible(true);
     }
 
     void update() {

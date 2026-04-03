@@ -32,20 +32,45 @@ template<typename T> bool removeFromVector(std::vector<T> *vector, const T &elem
     return false;
 }
 
+
+
+
 // cppcheck-suppress unusedFunction
-template<typename T> [[maybe_unused]] sf::Rect<T> debug(const sf::Rect<T> rect)  {
-    std::cout << "debug: " << rect.position.x << " " << rect.position.y << ", " << rect.size.x << " " << rect.size.y << std::endl;
+[[maybe_unused]] sf::RectangleShape debug_fmt(const sf::RectangleShape rect)  {
+    std::cout << rect.getPosition().x << " " << rect.getPosition().y << ", " 
+            << rect.getSize().x << " " << rect.getSize().y << std::endl;
     return rect;
 };
 
 // cppcheck-suppress unusedFunction
-template<typename T> [[maybe_unused]] sf::Vector2<T> debug(const sf::Vector2<T> vec)  {
-    std::cout << "debug: " << vec.x << " " << vec.y << std::endl;
+template<typename T> [[maybe_unused]] sf::Rect<T> debug_fmt(const sf::Rect<T> rect)  {
+    std::cout << rect.position.x << " " << rect.position.y << ", " << rect.size.x << " " << rect.size.y << std::endl;
+    return rect;
+};
+
+// cppcheck-suppress unusedFunction
+template<typename T> [[maybe_unused]] sf::Vector2<T> debug_fmt(const sf::Vector2<T> vec)  {
+    std::cout << vec.x << " " << vec.y << std::endl;
     return vec;
 };
 
 // cppcheck-suppress unusedFunction
-template<typename T> [[maybe_unused]] T debug(const T &x)  {
-    std::cout << "debug: " << x << std::endl;
+template<typename T> [[maybe_unused]] T debug_fmt(const T &x)  {
+    std::cout << x << std::endl;
     return x;
 };
+
+// cppcheck-suppress unusedFunction
+[[maybe_unused]] void debug_fmt()  {
+    std::cout << std::endl;
+}
+
+// cppcheck-suppress unusedFunction
+[[maybe_unused]] void debug_str_fmt(const char str[])  {
+    std::cout << " [" << str << "] = ";
+}
+
+// cppcheck-suppress unusedFunction
+[[maybe_unused]] void debug_str_fmt()  {}
+
+#define DBG(...) (std::cerr << "Debug: " << __FILE__ << ":" << __LINE__, debug_str_fmt(#__VA_ARGS__), debug_fmt(__VA_ARGS__))

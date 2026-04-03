@@ -29,7 +29,7 @@ class Entity {
     float wobble_position;
     float wobble_amplitude;
 
-    std::shared_ptr<Gang> gang;
+    Team team;
     Entity *target;
     
     unsigned health;
@@ -41,8 +41,8 @@ class Entity {
 public:
     enum class Direction { Left, Right };
 
-    Entity(const EntityTextures &textures);
-    virtual ~Entity();
+    explicit Entity(const EntityTextures &textures);
+    virtual ~Entity() = default;
     // This object should never be copied implicitly!
     Entity(const Entity&) = delete;
     Entity& operator=(const Entity&) = delete;
@@ -78,16 +78,9 @@ private:
     void setTexture(const sf::Texture &texture);
     void progressWobble(const float desired_amplitude, const float speed, const float dt);
 
-    // ChunkIterator iterateOverChunks();
-    void addToChunks();
-    void removeFromChunks();
     void walkTowards(const sf::Vector2f destination, const float dt);
 
-    void searchAggro(const float search_radius);
     void updateAggroLoss();
-    void spreadAggro();
-    void askComradesForAggro();
-    void updateAggroGain();
 
     void update(const float dt);
 };
@@ -95,7 +88,7 @@ private:
 class Gang {
     friend class Entity;
 
-    const Team team;
+    Team team;
     std::vector<std::unique_ptr<Entity>> entities;
     std::shared_ptr<GameMap> game_map;
     sf::Vector2f spawn_position;
@@ -114,15 +107,14 @@ class Gang {
 
 public:
     Gang(std::shared_ptr<GameMap> game_map, const Team team);
-    ~Gang() = default; // No explicit destructor, all handled by smart pointers!
     // This object should never be copied implicitly!
     Gang(const Gang&) = delete;
     Gang& operator=(const Gang&) = delete;
-    Gang(Gang&&) = delete;
-    Gang& operator=(Gang&&) = delete;
+    Gang(Gang&&) = default;
+    Gang& operator=(Gang&&) = default;
     friend std::ostream& operator<<(std::ostream& out, const Gang &gang);
 
-    static void addEntity(std::shared_ptr<Gang> gang, std::unique_ptr<Entity> entity);
+    void addEntity(std::unique_ptr<Entity> entity);
 
     bool isEmpty() const;
     std::optional<sf::Vector2f> getGravePosition() const;
@@ -132,11 +124,11 @@ public:
     void stopWalking();
     void walkTowards(const sf::Vector2f new_destination);
 
+    void moveAllEntities(Gang &to);
     void updateWondering(const float dt);
-    void removeDeadTroops();
     void updateAggroLoss();
-    void moveAllEntities(std::shared_ptr<Gang> to);
     void update(const float dt);
+    void removeDeadTroops();
 };
 
 class ChunkIterator {
@@ -149,7 +141,6 @@ class ChunkIterator {
 
     ChunkIterator(GameMap &map, const sf::Vector2u start, const sf::Vector2u end);
 public:
-    ~ChunkIterator() = default; // No explicit destructor necessary.
     // This object should never be copied implicitly!
     ChunkIterator(const ChunkIterator&) = delete;
     ChunkIterator& operator=(const ChunkIterator&) = delete;
@@ -178,11 +169,10 @@ public:
         const sf::Vector2f chunk_size, const sf::Vector2u chunk_amounts, 
         const sf::Rect<float> inner_arena, const sf::RectangleShape &outer_arena
     );
-    ~GameMap() = default; // No explicit destructor necessary.
     // This object is expensive, and should never be copied implicitly!
     GameMap(const GameMap&) = delete;
     GameMap& operator=(const GameMap&) = delete;
-    GameMap(GameMap&&) = delete;
+    GameMap(GameMap&&) = default;
     GameMap& operator=(GameMap&&) = delete;
     friend std::ostream& operator<<(std::ostream& out, const GameMap &game_map);
 
@@ -194,6 +184,9 @@ private:
     sf::Vector2u getIndex(const sf::Vector2f position) const;
     std::vector<Entity*> &getChunk(const sf::Vector2u index);
     ChunkIterator iterateChunksInRadius(const sf::Vector2f position, const float radius);
+
+    void addEntity(Entity &entity);
+    void removeEntity(Entity &entity);
 
 public:
     void reset();
