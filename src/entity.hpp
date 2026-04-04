@@ -14,10 +14,6 @@ class ChunkIterator;
 class Projectile {
     friend class GameMap;
 
-    sf::Vector2f velocity;
-
-    Entity* last_hit_entity; 
-
 protected:
     Team team;
     bool to_delete;
@@ -25,6 +21,9 @@ protected:
 
 public:
     sf::Sprite sprite;
+    sf::Vector2f velocity;
+    Entity* last_hit_entity; 
+    
     Projectile(const sf::Texture &texture, Entity &entity, const float speed);
     sf::Vector2f getOrigin() const;
 };

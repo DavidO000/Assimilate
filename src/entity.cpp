@@ -7,7 +7,7 @@
 #include "entity.hpp"
 
 Projectile::Projectile(const sf::Texture &texture, Entity &entity, const float speed): 
-    sprite(sf::Sprite(texture)), team(entity.team), to_delete(false)  
+    team(entity.team), to_delete(false), sprite(sf::Sprite(texture)) 
 {
     sf::Vector2f delta = entity.getTarget()->getOrigin() - entity.getOrigin();
     if(delta == sf::Vector2f()) {
@@ -538,12 +538,11 @@ void GameMap::updateMovement(const float dt) {
         sf::Vector2u top_left = getIndex({std::min(old_position.x, new_position.x), std::min(old_position.y, new_position.y)});
         sf::Vector2u bottom_right = getIndex({std::max(old_position.x, new_position.x), std::max(old_position.y, new_position.y)});
 
-        // auto iterator = ChunkIterator(
-        //     *this, 
-        //     {std::clamp(top_left.x, 0U, chunk_amounts.x), std::clamp(top_left.y, 0U, chunk_amounts.y)},
-        //     {std::clamp(bottom_right.x, 0U, chunk_amounts.x), std::clamp(bottom_right.y, 0U, chunk_amounts.y)}
-        // );
-        auto iterator = iterateChunksInRadius(projectiles[i]->getOrigin(), projectiles[i]->sprite.getTexture().getSize().x / 2.0f);
+        auto iterator = ChunkIterator(
+            *this,
+            {std::clamp(top_left.x, 0U, chunk_amounts.x - 1), std::clamp(top_left.y, 0U, chunk_amounts.y - 1)},
+            {std::clamp(bottom_right.x, 0U, chunk_amounts.x - 1), std::clamp(bottom_right.y, 0U, chunk_amounts.y - 1)}
+        );
         while(auto chunk = iterator.next()) {
             for(auto other: *chunk) {
                 if(other->isDead() || projectiles[i]->last_hit_entity == other) continue;

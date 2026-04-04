@@ -1,5 +1,9 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
+#include <random>
+
+static std::random_device rd;
+static std::mt19937 gen(rd());
 
 template<typename T> T subSat(const T x, const T y) {
     return y > x ? 0 : x - y;
