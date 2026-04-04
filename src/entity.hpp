@@ -3,14 +3,34 @@
 #include <algorithm>
 #include <SFML/Graphics.hpp>
 #include "utils.cpp"
-#include "entity_builder.cpp"
+#include "texture_holder.cpp"
 
+class Projectile;
 class Entity;
 class Gang;
 class GameMap;
 class ChunkIterator;
 
+class Projectile {
+    friend class GameMap;
+
+    sf::Vector2f velocity;
+
+    Entity* last_hit_entity; 
+
+protected:
+    Team team;
+    bool to_delete;
+    virtual void hitEntity(Entity *hit) = 0;
+
+public:
+    sf::Sprite sprite;
+    Projectile(const sf::Texture &texture, Entity &entity, const float speed);
+    sf::Vector2f getOrigin() const;
+};
+
 class Entity {
+    friend class Projectile;
     friend class Gang;
     friend class GameMap;
 
@@ -38,6 +58,8 @@ class Entity {
     float time_since_revived;
     float time_since_was_attacked;
 
+    std::vector<std::unique_ptr<Projectile>> projectiles;
+
 public:
     enum class Direction { Left, Right };
 
@@ -50,6 +72,7 @@ public:
     Entity& operator=(Entity&&) = delete;
     friend std::ostream& operator<<(std::ostream& out, const Entity &entity);
 
+    Team getTeam() const;
     sf::Vector2f getOrigin() const;
     bool isDead() const;
     void takeDamage(const unsigned amount);
@@ -58,6 +81,7 @@ public:
 
 protected:
     Entity* getTarget();
+    void throwProjectile(std::unique_ptr<Projectile> projectile);
 
     virtual float getRadius() const = 0;
     virtual float getSpeed() const = 0;
@@ -86,8 +110,6 @@ private:
 };
 
 class Gang {
-    friend class Entity;
-
     Team team;
     std::vector<std::unique_ptr<Entity>> entities;
     std::shared_ptr<GameMap> game_map;
@@ -107,6 +129,7 @@ class Gang {
 
 public:
     Gang(std::shared_ptr<GameMap> game_map, const Team team);
+    ~Gang() = default;
     // This object should never be copied implicitly!
     Gang(const Gang&) = delete;
     Gang& operator=(const Gang&) = delete;
@@ -140,6 +163,7 @@ class ChunkIterator {
     sf::Vector2u position;
 
     ChunkIterator(GameMap &map, const sf::Vector2u start, const sf::Vector2u end);
+
 public:
     // This object should never be copied implicitly!
     ChunkIterator(const ChunkIterator&) = delete;
@@ -151,18 +175,21 @@ public:
 };
 
 class GameMap {
-    friend class Entity;
     friend class Gang;
     friend class ChunkIterator;
 
     static constexpr float OutsideSpawnWidth = 100.0f;
 
-    std::vector<Entity*> all_entities_cache;
-    std::vector<std::vector<Entity*>> map;
     const sf::Vector2f chunk_size;
     const sf::Vector2u chunk_amounts;
+
     const sf::Rect<float> inner_arena;
     const sf::RectangleShape outer_arena;
+    
+    std::vector<Entity*> all_entities_cache;
+    std::vector<std::vector<Entity*>> map;
+
+    std::vector<std::unique_ptr<Projectile>> projectiles;
 
 public:
     GameMap(
@@ -185,11 +212,10 @@ private:
     std::vector<Entity*> &getChunk(const sf::Vector2u index);
     ChunkIterator iterateChunksInRadius(const sf::Vector2f position, const float radius);
 
-    void addEntity(Entity &entity);
-    void removeEntity(Entity &entity);
+    void addToChunks(Entity &entity);
 
 public:
     void reset();
-    void updateMovement();
+    void updateMovement(const float dt);
     void draw(sf::RenderWindow &window);
 };

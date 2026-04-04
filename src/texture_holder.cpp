@@ -24,7 +24,7 @@ inline void setTexture(sf::Texture &texture, std::string &dir_name, const char n
 }
 
 class EntityTextures {
-    friend class EntityBuilder;
+    friend class TextureHolder;
 
     sf::Texture player;
     sf::Texture player_prepare_attack;
@@ -34,7 +34,7 @@ class EntityTextures {
     sf::Texture enemy_attack;
     sf::Texture dead;
 
-    EntityTextures(std::string dir_name) {
+    explicit EntityTextures(std::string dir_name) {
         setTexture(player, dir_name, "player.png");
         setTexture(player_prepare_attack, dir_name, "player_prepare_attack.png");
         setTexture(player_attack, dir_name, "player_attack.png");
@@ -84,7 +84,7 @@ public:
     }
 };
 
-class EntityBuilder {
+class TextureHolder {
     sf::Texture start_sign;
     sf::Texture paused_sign;
     sf::Texture over_sign;
@@ -93,23 +93,25 @@ class EntityBuilder {
 
     EntityTextures grunt;
 
+    sf::Texture fireball;
 public:
-    EntityBuilder(): grunt("assets/grunt/") {
+    TextureHolder(): grunt("assets/grunt/") {
         setTexture(start_sign, "assets/start_sign.png");
         setTexture(paused_sign, "assets/paused_sign.png");
         setTexture(over_sign, "assets/over_sign.png");
         setTexture(arena, "assets/arena.png");
         setTexture(grave, "assets/gravestone.png");
+        setTexture(fireball, "assets/mage/fireball.png");
     }
 
     // This object is expensive, and should never be copied implicitly!
-    ~EntityBuilder() = default;
-    EntityBuilder(const EntityBuilder&) = delete;
-    EntityBuilder& operator=(const EntityBuilder&) = delete;
-    EntityBuilder(EntityBuilder&&) = delete;
-    EntityBuilder& operator=(EntityBuilder&&) = delete;
-    friend std::ostream& operator<<(std::ostream& out, const EntityBuilder &entity_builder) {
-        out << "Grunt: " << entity_builder.grunt;
+    ~TextureHolder() = default;
+    TextureHolder(const TextureHolder&) = delete;
+    TextureHolder& operator=(const TextureHolder&) = delete;
+    TextureHolder(TextureHolder&&) = delete;
+    TextureHolder& operator=(TextureHolder&&) = delete;
+    friend std::ostream& operator<<(std::ostream& out, const TextureHolder &texture_holder) {
+        out << "Grunt: " << texture_holder.grunt;
         return out;
     }
 
@@ -120,4 +122,6 @@ public:
     const sf::Texture &getGrave() const { return grave; }
 
     const EntityTextures &getGrunt() const { return grunt; }
+
+    const sf::Texture &getFireball() const { return fireball; }
 };

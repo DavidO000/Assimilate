@@ -3,10 +3,6 @@
 #include "overlay.cpp"
 
 class Game {
-    struct WindowData { sf::Vector2u size; sf::Vector2i position; };
-    std::optional<WindowData> last_window_data;
-    sf::Clock clock;
-
     float time_since_started;
     float time_since_last_spawn;
     float time_until_next_spawn;
@@ -18,17 +14,18 @@ class Game {
     bool left_click;
     float zoom_factor;
 
-    const EntityBuilder entity_builder;
+    const TextureHolder texture_holder;
     std::shared_ptr<GameMap> game_map;
     std::vector<Gang> gangs;
     Gang troops;
 
-    sf::Sprite grave;
     Overlay start_overlay;
     Overlay paused_overlay;
     Overlay over_overlay;
-    // window at the end to be as close to updating as possible
-    sf::RenderWindow window;
+    struct WindowData { sf::Vector2u size; sf::Vector2i position; };
+    std::optional<WindowData> last_window_data;
+    sf::Clock clock;
+    sf::RenderWindow window; // window at the end to be as close to updating as possible
 
     static constexpr char GameName[] = "Assimilate";
 
@@ -39,7 +36,7 @@ class Game {
         constexpr sf::Vector2f edge_size(1500.0f, 1500.0f);
         sf::RectangleShape outer_arena(inner_arena.size + edge_size * 2.0f);
         outer_arena.setPosition(inner_arena.position - edge_size);
-        outer_arena.setTexture(&entity_builder.getArena());
+        outer_arena.setTexture(&texture_holder.getArena());
 
         const sf::Vector2f chunk_size = {100.0f, 100.0f};
         const sf::Vector2u chunks((outer_arena.getSize() + chunk_size).componentWiseDiv(chunk_size));
@@ -53,10 +50,9 @@ public:
         time_since_last_second(0.0f), frames_since_last_second(0),
         left_click(false), zoom_factor(1.0f),
         game_map(makeGameMap()), troops(Gang(game_map, Team::Player)),
-        grave(sf::Sprite(entity_builder.getGrave())),
-        start_overlay { sf::Sprite(entity_builder.getStartSign()), Brown, OverlayOrder::Coming },
-        paused_overlay { sf::Sprite(entity_builder.getPausedSign()), Gray, OverlayOrder::Going },
-        over_overlay { sf::Sprite(entity_builder.getOverSign()), Gray, OverlayOrder::Going },
+        start_overlay { sf::Sprite(texture_holder.getStartSign()), Brown, OverlayOrder::Coming },
+        paused_overlay { sf::Sprite(texture_holder.getPausedSign()), Gray, OverlayOrder::Going },
+        over_overlay { sf::Sprite(texture_holder.getOverSign()), Gray, OverlayOrder::Going },
         window(sf::RenderWindow(sf::VideoMode({800, 600}), GameName))
     {
         window.setVisible(false);
@@ -91,7 +87,7 @@ private:
 
         troops = Gang(game_map, Team::Player);
         for(unsigned i = 0; i < 5; i++) {
-            auto ptr = std::make_unique<Grunt>(entity_builder);
+            auto ptr = std::make_unique<Grunt>(texture_holder);
             troops.addEntity(std::move(ptr));
         }
 
@@ -100,7 +96,7 @@ private:
             Gang gang(game_map, Team::Enemy);
             unsigned amount = rand() % 5 + 1;
                 for(unsigned j = 0; j < amount; j++) {
-                auto ptr = std::make_unique<Grunt>(entity_builder);
+                auto ptr = std::make_unique<Grunt>(texture_holder);
                 gang.addEntity(std::move(ptr));
             }
             gangs.push_back(std::move(gang));
@@ -197,7 +193,7 @@ private:
                 Gang gang(game_map, Team::Enemy);
                 unsigned amount = 2.0f * std::pow(time_since_started, 0.66) + 1;
                 for(unsigned j = 0; j < amount; j++) {
-                    auto ptr = std::make_unique<Grunt>(entity_builder);
+                    auto ptr = std::make_unique<Grunt>(texture_holder);
                     gang.addEntity(std::move(ptr));
                 }
                 gangs.push_back(std::move(gang));
@@ -223,7 +219,7 @@ private:
 
         troops.removeDeadTroops();
 
-        game_map->updateMovement();
+        game_map->updateMovement(dt);
 
         if(troops.isEmpty() && !over_overlay.isIn()) over_overlay.set();
     }
@@ -237,8 +233,10 @@ private:
 
             window.clear(sf::Color::Black);
             game_map->draw(window);
+
             for(const auto &gang: gangs) {
                 if(auto grave_position = gang.getGravePosition()) {
+                    sf::Sprite grave = sf::Sprite(texture_holder.getGrave());
                     grave.setPosition(*grave_position - sf::Vector2f(grave.getTexture().getSize()) / 2.0f);
                     window.draw(grave);
                 }

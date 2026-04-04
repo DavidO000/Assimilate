@@ -6,6 +6,24 @@
 #include <SFML/Graphics.hpp>
 #include "entity.hpp"
 
+Projectile::Projectile(const sf::Texture &texture, Entity &entity, const float speed): 
+    sprite(sf::Sprite(texture)), team(entity.team), to_delete(false)  
+{
+    sf::Vector2f delta = entity.getTarget()->getOrigin() - entity.getOrigin();
+    if(delta == sf::Vector2f()) {
+        to_delete = true;
+        velocity = delta;
+    } else {
+        velocity = delta.normalized() * speed;
+    }
+        
+    sprite.setPosition(entity.getOrigin() - sf::Vector2f(sprite.getTexture().getSize()) / 2.0f);
+}
+
+sf::Vector2f Projectile::getOrigin() const {
+    return sprite.getPosition() + sf::Vector2f(sprite.getTexture().getSize()) / 2.0f;
+}
+
 Entity::Entity(const EntityTextures &textures_):
     textures(textures_), sprite(textures.getDead()), radius(0.0f),
     wobble_position(0.0f), wobble_amplitude(StandingWobbleAmplitude),
@@ -20,6 +38,10 @@ std::ostream& operator<<(std::ostream& out, const Entity &entity) {
         << ", Scale: " << entity.sprite.getScale().x << ", " << entity.sprite.getScale().y
         << ", Radius: " << entity.getRadius() << " , Health: " << entity.health; 
     return out;
+}
+
+Team Entity::getTeam() const {
+    return team;
 }
 
 sf::Vector2f Entity::getOrigin() const {
@@ -75,6 +97,10 @@ void Entity::draw(sf::RenderWindow &window) const {
 
 Entity* Entity::getTarget() {
     return target;
+}
+
+void Entity::throwProjectile(std::unique_ptr<Projectile> projectile) {
+    projectiles.push_back(std::move(projectile));
 }
 
 void Entity::setDirection(const Direction direction) {
@@ -135,6 +161,10 @@ void Entity::update(const float dt) {
 
     if(time_since_was_attacked < 0.2) sprite.setColor(sf::Color(160, 160, 160));
     else sprite.setColor(sf::Color::White);
+
+    if(time_since_attacked > getAttackDuration()) {
+        setTexture(textures.getAlive(team));
+    }
 }
 
 
@@ -176,7 +206,7 @@ void Gang::addEntity(std::unique_ptr<Entity> entity) {
     entity->setTexture(entity->textures.getAlive(team));
     entity->sprite.setPosition(clampPoint(spawn_position, game_map->getBoundry()));
 
-	game_map->addEntity(*entity);
+	game_map->addToChunks(*entity);
 
     game_map->all_entities_cache.push_back(entity.get());
     entities.push_back(std::move(entity));
@@ -262,10 +292,6 @@ void Gang::update(const float dt) {
 
         entity->update(dt);
 
-        if(entity->time_since_attacked > entity->getAttackDuration()) {
-            entity->setTexture(entity->textures.getAlive(team));
-        }
-
 		const Entity* old_target = entity->target;
 		// search aggro
 		auto iterator = game_map->iterateChunksInRadius(entity->getOrigin(), entity->getAggroRadius());
@@ -346,7 +372,7 @@ void Gang::update(const float dt) {
 		if(!grave_position.has_value()) {
 			bool all_are_dead = std::all_of(
 				entities.begin(), entities.end(), 
-				[](auto &entity){ return entity->isDead(); }
+				[](const auto &entity){ return entity->isDead(); }
 			);
 			if(all_are_dead) {
 				grave_position = getAveragePosition();
@@ -355,7 +381,7 @@ void Gang::update(const float dt) {
 
         bool all_are_free_to_go = std::all_of(
             entities.begin(), entities.end(), 
-            [](auto &entity){ return entity->target == nullptr; }
+            [](const auto &entity){ return entity->target == nullptr; }
         );
         if(all_are_free_to_go)
             updateWondering(dt);
@@ -365,7 +391,6 @@ void Gang::update(const float dt) {
 void Gang::removeDeadTroops() {
     for(unsigned i = 0; i < entities.size();) {
         if(entities[i]->isDead()) {
-            game_map->removeEntity(*entities[i]);
             if(!removeFromVector(&game_map->all_entities_cache, &*entities[i])) {
                 std::cerr << "Entity cache invariance not upheld" << std::endl;
             }
@@ -475,28 +500,79 @@ ChunkIterator GameMap::iterateChunksInRadius(const sf::Vector2f position, const 
     return ChunkIterator(*this, start, end);
 }
 
-void GameMap::addEntity(Entity &entity) {
+void GameMap::addToChunks(Entity &entity) {
     auto iterator = iterateChunksInRadius(entity.getOrigin(), entity.getRadius());
     while(auto chunk = iterator.next()) {
         chunk->push_back(&entity);
     }
 }
 
-void GameMap::removeEntity(Entity &entity) {
-    auto iterator = iterateChunksInRadius(entity.getOrigin(), entity.getRadius());
-    while(auto chunk = iterator.next()) {
-        if(!removeFromVector(chunk, &entity)) {
-            std::cerr << "Chunk invariance not upheld." << std::endl;
+void GameMap::reset() {
+    for(auto chunk: map) chunk.clear();
+    all_entities_cache.clear();
+    projectiles.clear();
+}
+
+void GameMap::updateMovement(const float dt) {
+    static constexpr float PerTickKnockbackRatio = 1.0f / 100.0f;
+
+    for(auto entity: all_entities_cache) {
+        projectiles.insert(
+            projectiles.end(),
+            std::make_move_iterator(entity->projectiles.begin()),
+            std::make_move_iterator(entity->projectiles.end())
+        );
+        entity->projectiles.clear();
+    }
+
+    for(unsigned i = 0; i < projectiles.size();) {
+        sf::Vector2 delta = projectiles[i]->velocity * dt;
+        sf::Vector2f old_position = projectiles[i]->getOrigin();
+        projectiles[i]->sprite.move(delta);
+        sf::Vector2f new_position = projectiles[i]->getOrigin();
+
+        float spine_width = projectiles[i]->sprite.getTexture().getSize().x / 2.0f;
+        sf::Vector2f spine_normalised = delta == sf::Vector2f() ? sf::Vector2f(1.0f, sf::radians(rand())) : delta.normalized();
+        sf::Vector2f spine_rotated = { -spine_normalised.y, spine_normalised.x };
+
+        sf::Vector2u top_left = getIndex({std::min(old_position.x, new_position.x), std::min(old_position.y, new_position.y)});
+        sf::Vector2u bottom_right = getIndex({std::max(old_position.x, new_position.x), std::max(old_position.y, new_position.y)});
+
+        // auto iterator = ChunkIterator(
+        //     *this, 
+        //     {std::clamp(top_left.x, 0U, chunk_amounts.x), std::clamp(top_left.y, 0U, chunk_amounts.y)},
+        //     {std::clamp(bottom_right.x, 0U, chunk_amounts.x), std::clamp(bottom_right.y, 0U, chunk_amounts.y)}
+        // );
+        auto iterator = iterateChunksInRadius(projectiles[i]->getOrigin(), projectiles[i]->sprite.getTexture().getSize().x / 2.0f);
+        while(auto chunk = iterator.next()) {
+            for(auto other: *chunk) {
+                if(other->isDead() || projectiles[i]->last_hit_entity == other) continue;
+                sf::Vector2f other_delta = other->getOrigin() - old_position;
+
+                sf::Vector2f projected(other_delta.dot(spine_normalised), other_delta.dot(spine_rotated));
+
+                sf::Vector2f closest_point(
+                    std::clamp(projected.x, 0.0f, delta.length()),
+                    std::clamp(projected.y, -spine_width, spine_width)
+                );
+                float distance_to_closest_point = (closest_point - projected).length();
+                if(distance_to_closest_point <= other->getRadius()) {
+                    projectiles[i]->hitEntity(other);
+                    projectiles[i]->last_hit_entity = other;
+                }
+            }
+        }
+
+        if(projectiles[i]->to_delete 
+        || !(getBoundry().contains(projectiles[i]->getOrigin()))
+        || projectiles[i]->velocity == sf::Vector2f()) {
+            std::swap(projectiles[i], projectiles[projectiles.size() - 1]);
+            projectiles.pop_back();
+            continue;
+        } else {
+            i++; // here and not in for as to not skip when deleted
         }
     }
-}
-
-void GameMap::reset() {
-    all_entities_cache.clear();
-}
-
-static constexpr float PerTickKnockbackRatio = 1.0f / 100.0f;
-void GameMap::updateMovement() {
 
     struct CollisionPair {
         Entity* a;
@@ -506,7 +582,7 @@ void GameMap::updateMovement() {
 
     for(auto &entity: all_entities_cache) {
         if(entity->isDead()) continue;
-        auto iterator = iterateChunksInRadius(entity->getOrigin(), entity->radius);
+        auto iterator = iterateChunksInRadius(entity->getOrigin(), entity->getRadius());
         while(const auto *const chunk = iterator.next()) {
             for(auto other: *chunk) {
                 if(other <= entity || other->isDead()) continue;
@@ -543,7 +619,7 @@ void GameMap::updateMovement() {
         entity->knocked_back -= entity->knocked_back * PerTickKnockbackRatio;
         if(entity->isDead()) continue;
         entity->sprite.setPosition(clampPoint(entity->sprite.getPosition(), getBoundry()));
-        addEntity(*entity);
+        addToChunks(*entity);
     }
 }
 
@@ -570,5 +646,8 @@ void GameMap::draw(sf::RenderWindow &window) {
         });
     for(const Entity *entity: all_entities_cache) {
         entity->draw(window);
+    }
+    for(const auto &projectile: projectiles) {
+        window.draw(projectile->sprite);
     }
 }

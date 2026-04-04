@@ -46,6 +46,13 @@ FetchContent_MakeAvailable(SFML)
 
 ###############################################################################
 
+FetchContent_Declare(backward
+    GIT_REPOSITORY https://github.com/bombela/backward-cpp
+    GIT_TAG        master)
+FetchContent_MakeAvailable(backward)
+
+###############################################################################
+
 # external dependencies with find_package
 
 find_package(Threads REQUIRED)
