@@ -45,8 +45,8 @@ class Game {
         outer_arena.setTexture(&arena_texture);
         constexpr sf::Vector2f chunk_size(100.0f, 100.0f);
         const sf::Vector2u chunks(
-            std::ceilf(outer_arena_size.x / chunk_size.x), 
-            std::ceilf(outer_arena_size.y / chunk_size.y)
+            std::ceil(outer_arena_size.x / chunk_size.x), 
+            std::ceil(outer_arena_size.y / chunk_size.y)
         );
         return std::make_shared<GameMap>(chunk_size, chunks, inner_arena, outer_arena);
     }

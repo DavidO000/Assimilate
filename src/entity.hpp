@@ -25,6 +25,7 @@ public:
     Entity* last_hit_entity; 
     
     Projectile(const sf::Texture &texture, Entity &entity, const float speed);
+    virtual ~Projectile() = default;
     sf::Vector2f getOrigin() const;
 };
 
