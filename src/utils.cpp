@@ -82,8 +82,7 @@ template<typename T> [[maybe_unused]] T debug_fmt(const T &x)  {
 }
 
 // cppcheck-suppress unusedFunction
-template<typename T> [[maybe_unused]]
-T debug_defer_fmt(const char file[], int line, const char str[], T arg) {
+template<typename T> [[maybe_unused]] T debug_defer_fmt(const char file[], int line, const char str[], T arg) {
     std::cerr << "Debug: " << file << ":" << line << " [" << str << "] = ";
     T value = debug_fmt(arg);
     std::cerr << std::endl;

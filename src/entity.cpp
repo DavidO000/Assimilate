@@ -384,7 +384,7 @@ void Gang::update(const float dt) {
                                 if(distance_to_other > entity->getAttackRadius()) continue;
 
                                 bool is_in = std::any_of(entities_hit.begin(), entities_hit.end(), 
-                                    [other](Entity *entity_hit) { return entity_hit == other; });
+                                    [other](const Entity *entity_hit) { return entity_hit == other; });
                                 
                                 if(!is_in) {
                                     other->takeDamage(entity->aoe_damage);

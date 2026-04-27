@@ -4,7 +4,7 @@ class Fireball: public Projectile {
     static const sf::Texture texture;
 
 public:
-    Fireball(Entity &entity): Projectile(texture, entity, 500.0f) {}
+    explicit Fireball(Entity &entity): Projectile(texture, entity, 500.0f) {}
 
     void hitEntity(Entity *hit) override {
         bool is_same_team = team == hit->getTeam();
