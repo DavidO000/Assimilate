@@ -16,7 +16,7 @@ Projectile::Projectile(const sf::Texture &texture, Entity &entity, const float s
     } else {
         velocity = delta.normalized() * speed;
     }
-        
+
     sprite.setPosition(entity.getOrigin() - sf::Vector2f(sprite.getTexture().getSize()) / 2.0f);
 }
 
@@ -28,6 +28,7 @@ Entity::Entity(const EntityTextures &textures_):
     textures(textures_), sprite(textures.getDead()), radius(0.0f),
     wobble_position(0.0f), wobble_amplitude(StandingWobbleAmplitude),
     team(Team::Enemy), target(nullptr),
+    aoe_damage(0), aoe_knockback(0.0),
     health(0), attack_counter(0.0f), time_since_attacked(INFINITY),
     time_since_revived(0.0f), time_since_was_attacked(INFINITY) {}
 
@@ -46,6 +47,12 @@ Team Entity::getTeam() const {
 
 sf::Vector2f Entity::getOrigin() const {
     return sprite.getPosition() + sf::Vector2f(radius, -radius);
+}
+
+float Entity::getDistanceBetween(const Entity &other) const {
+    float distance_from_origins = (getOrigin() - other.getOrigin()).length();
+    float distance_between = distance_from_origins - radius - other.radius;
+    return distance_between;
 }
 
 bool Entity::isDead() const {
@@ -97,6 +104,14 @@ void Entity::draw(sf::RenderWindow &window) const {
 
 Entity* Entity::getTarget() {
     return target;
+}
+
+void Entity::setAOEDamage(const unsigned amount) {
+    aoe_damage = amount;
+}
+
+void Entity::setAOEKnockback(const float amount) {
+    aoe_knockback = amount;
 }
 
 void Entity::throwProjectile(std::unique_ptr<Projectile> projectile) {
@@ -179,7 +194,7 @@ Gang::Gang(std::shared_ptr<GameMap> game_map, const Team team):
 {
     if(team == Team::Player) {
         move_info.to_move = false;
-    } else {
+    } else if(team == Team::Enemy) {
         spawn_position = makeSpawnPoint();
         move_info.to_wait.to_wait = false;
         move_info.to_wait.time_since_arrived = 0.0f;
@@ -271,6 +286,9 @@ void Gang::moveAllEntities(Gang &to) {
         entity->time_since_attacked = INFINITY;
         entity->time_since_was_attacked = INFINITY;
         entity->time_since_revived = 0.0f;
+        entity->to_move = {0.0f, 0.0f};
+        entity->knocked_back = {0.0f, 0.0f};
+        entity->aoe_damage = 0;
     }
     to.entities.insert(
         to.entities.end(),
@@ -298,19 +316,16 @@ void Gang::update(const float dt) {
 		while(auto chunk = iterator.next()) {
 			for(unsigned i = 0; i < chunk->size(); i++) {
 				const auto other = chunk->at(i);
-				if(other == &*entity || other->isDead()) continue;
-				const bool are_same_team = team == other->team;
-				if(are_same_team) continue;
+				if(other->isDead() || !isEnemyTeam(team, other->team)) continue;
 
-				const sf::Vector2f delta = entity->getOrigin() - other->getOrigin();
-				const float distance = delta.length();
-				if(distance > entity->getAggroRadius()) continue;
+				const float distance_between = entity->getDistanceBetween(*other);
+				if(distance_between > entity->getAggroRadius()) continue;
 
 				if(entity->target == nullptr) {
 					entity->target = other;
 				} else {
-					const float current_distance = (entity->getOrigin() - entity->target->getOrigin()).length();
-					if(distance < current_distance) {
+					const float current_distance = entity->getDistanceBetween(*entity->target);
+					if(distance_between < current_distance) {
 						entity->target = other;
 					}
 				}
@@ -318,23 +333,23 @@ void Gang::update(const float dt) {
 		}
 
         if(team == Team::Player) {
-            if(old_target != entity->target && entity->target != nullptr) {
+            if(old_target != entity->target) {
 				// spread aggro
                 for(const auto &comrade: entities) {
-					if(comrade.get() == &*entity || comrade->isDead() || comrade->target != nullptr) continue;
-					const float distance_to_comrade = (entity->getOrigin() - comrade->getOrigin()).length();
+					if(comrade->isDead() || comrade->target != nullptr) continue;
+					const float distance_to_comrade = entity->getDistanceBetween(*comrade);
 					if(distance_to_comrade <= entity->getAggroSpreadRadius()) {
 						comrade->target = entity->target;
 					}
 				}
             }
-        } else {
+        } else if(team == Team::Enemy) {
             if(entity->target == nullptr) {
 				// ask comrades for aggro
                 float distance_for_current_aggro = INFINITY;
 				for(auto &comrade: entities) {
 					if(comrade.get() == &*entity || comrade->isDead() || comrade->target == nullptr) continue;
-					const float distance_to_comrade = (entity->getOrigin() - comrade->getOrigin()).length();
+					const float distance_to_comrade = entity->getDistanceBetween(*comrade);
 					if(distance_to_comrade < distance_for_current_aggro) {
 						entity->target = comrade->target;
 						distance_for_current_aggro = distance_to_comrade;
@@ -350,7 +365,7 @@ void Gang::update(const float dt) {
                 entity->progressWobble(Entity::StandingWobbleAmplitude, Entity::StandingWobbleSpeed, dt);
             }
         } else {
-            const float distance_to_target = (entity->getOrigin() - entity->target->getOrigin()).length();
+            const float distance_to_target = entity->getDistanceBetween(*entity->target);
             if(distance_to_target > entity->getPrefferedAttackRadius()) {
                 entity->walkTowards(entity->target->getOrigin(), dt);
             }
@@ -358,6 +373,28 @@ void Gang::update(const float dt) {
                 entity->attack_counter += dt;
                 if(entity->attack_counter > entity->getAttackSpeed()) {
                     entity->attack();
+
+                    if(entity->aoe_damage != 0 || entity->aoe_knockback != 0) {
+                        auto aoe_iterator = game_map->iterateChunksInRadius(entity->getOrigin(), entity->getAttackRadius());
+                        std::vector<Entity*> entities_hit;
+                        while(auto chunk = aoe_iterator.next()) {
+                            for(auto &other: *chunk) {
+                                if(other->isDead() || other->team == entity->team) continue;
+                                float distance_to_other = entity->getDistanceBetween(*other);
+                                if(distance_to_other > entity->getAttackRadius()) continue;
+
+                                bool is_in = std::any_of(entities_hit.begin(), entities_hit.end(), 
+                                    [other](Entity *entity_hit) { return entity_hit == other; });
+                                
+                                if(!is_in) {
+                                    other->takeDamage(entity->aoe_damage);
+                                    other->takeKnockback(entity->getOrigin(), entity->aoe_knockback);
+                                    entities_hit.push_back(other);
+                                }
+                            }
+                        }
+                    }
+
                     entity->setTexture(entity->textures.getAttack(team));
                     entity->attack_counter = 0.0f;
                     entity->time_since_attacked = 0.0f;
@@ -372,7 +409,7 @@ void Gang::update(const float dt) {
 		if(!grave_position.has_value()) {
 			bool all_are_dead = std::all_of(
 				entities.begin(), entities.end(), 
-				[](const auto &entity){ return entity->isDead(); }
+				[](const auto &entity) { return entity->isDead(); }
 			);
 			if(all_are_dead) {
 				grave_position = getAveragePosition();
@@ -383,8 +420,10 @@ void Gang::update(const float dt) {
             entities.begin(), entities.end(), 
             [](const auto &entity){ return entity->target == nullptr; }
         );
-        if(all_are_free_to_go)
+
+        if(all_are_free_to_go) {
             updateWondering(dt);
+        }
     }
 }
 
@@ -484,7 +523,7 @@ sf::Vector2u GameMap::getIndex(const sf::Vector2f position) const {
 
 std::vector<Entity*> &GameMap::getChunk(const sf::Vector2u index) {
     if(index.x >= chunk_amounts.x || index.y >= chunk_amounts.y) throw "error";
-    return map[index.x * chunk_amounts.x + index.y];
+    return map[index.x * chunk_amounts.y + index.y];
 }
 
 ChunkIterator GameMap::iterateChunksInRadius(const sf::Vector2f position, const float radius) {
@@ -492,10 +531,14 @@ ChunkIterator GameMap::iterateChunksInRadius(const sf::Vector2f position, const 
     const sf::Vector2f rangef = sf::Vector2f(radius, radius).componentWiseDiv(chunk_size);
     const sf::Vector2u range(ceilf(rangef.x), ceilf(rangef.y));
 
-    const sf::Vector2u start(subSat(chunk_index.x, range.x), subSat(chunk_index.y, range.y));
+    const sf::Vector2u start(
+        std::min(subSat(chunk_index.x, range.x), chunk_amounts.x - 1), 
+        std::min(subSat(chunk_index.y, range.y), chunk_amounts.y - 1)
+    );
     const sf::Vector2u end(
         std::min(chunk_index.x + range.x, chunk_amounts.x - 1), 
-        std::min(chunk_index.y + range.y, chunk_amounts.y - 1));
+        std::min(chunk_index.y + range.y, chunk_amounts.y - 1)
+    );
 
     return ChunkIterator(*this, start, end);
 }
@@ -513,9 +556,7 @@ void GameMap::reset() {
     projectiles.clear();
 }
 
-void GameMap::updateMovement(const float dt) {
-    static constexpr float PerTickKnockbackRatio = 1.0f / 100.0f;
-
+void GameMap::updateProjectiles(const float dt) {
     for(auto entity: all_entities_cache) {
         projectiles.insert(
             projectiles.end(),
@@ -555,16 +596,18 @@ void GameMap::updateMovement(const float dt) {
                     std::clamp(projected.y, -spine_width, spine_width)
                 );
                 float distance_to_closest_point = (closest_point - projected).length();
-                if(distance_to_closest_point <= other->getRadius()) {
+                if(distance_to_closest_point <= other->radius) {
                     projectiles[i]->hitEntity(other);
                     projectiles[i]->last_hit_entity = other;
                 }
             }
         }
 
-        if(projectiles[i]->to_delete 
-        || !(getBoundry().contains(projectiles[i]->getOrigin()))
-        || projectiles[i]->velocity == sf::Vector2f()) {
+        bool to_delete = projectiles[i]->to_delete 
+        || !(getBoundry().contains(projectiles[i]->getOrigin())) 
+        || projectiles[i]->velocity == sf::Vector2f();
+
+        if(to_delete) {
             std::swap(projectiles[i], projectiles[projectiles.size() - 1]);
             projectiles.pop_back();
             continue;
@@ -572,7 +615,9 @@ void GameMap::updateMovement(const float dt) {
             i++; // here and not in for as to not skip when deleted
         }
     }
+}
 
+void GameMap::updateMovement() {
     struct CollisionPair {
         Entity* a;
         Entity* b;
@@ -608,8 +653,27 @@ void GameMap::updateMovement(const float dt) {
 
             const auto angle = delta.length() == 0.0f ? sf::radians(float(rand())) : delta.angle();
             const sf::Vector2f to_push(to_push_length, angle);
-            entity->sprite.move(to_push * 0.5f);
-            other->sprite.move(-to_push * 0.5f);
+            
+            if(entity->getWeight() == 0 && other->getWeight() == 0) continue;
+            if(entity->getWeight() == INFINITY && other->getWeight() == INFINITY) continue;
+
+            float entity_weight_proportion;
+            float other_weight_proportion;
+
+            if(entity->getWeight() == INFINITY) {
+                entity_weight_proportion = 0.0;
+                other_weight_proportion = 1.0;
+            } else if(other->getWeight() == INFINITY) {
+                entity_weight_proportion = 0.0;
+                other_weight_proportion = 1.0;
+            } else {
+                float weight_sum = entity->getWeight() + other->getWeight();
+                entity_weight_proportion = other->getWeight() / weight_sum;
+                other_weight_proportion = entity->getWeight() / weight_sum;
+            }
+
+            entity->sprite.move(to_push * entity_weight_proportion);
+            other->sprite.move(-to_push * other_weight_proportion);
         }
     }
 

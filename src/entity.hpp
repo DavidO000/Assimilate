@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <SFML/Graphics.hpp>
 #include "utils.cpp"
-#include "texture_holder.cpp"
+#include "entity_textures.cpp"
 
 class Projectile;
 class Entity;
@@ -36,7 +36,7 @@ class Entity {
     static constexpr float StandingWobbleAmplitude = 0.05f;
     static constexpr float StandingWobbleSpeed = 2.5f;
     static constexpr float MovingWobbleAmplitude = 0.075f;
-    static constexpr float MovingWobbleSpeed = 12.0f;
+    static constexpr float MovingWobbleSpeed = 18.0f;
 
     const EntityTextures &textures;
     sf::Sprite sprite;
@@ -50,7 +50,9 @@ class Entity {
 
     Team team;
     Entity *target;
-    
+    unsigned aoe_damage;
+    float aoe_knockback;
+
     unsigned health;
     float attack_counter;
     float time_since_attacked;
@@ -73,6 +75,7 @@ public:
 
     Team getTeam() const;
     sf::Vector2f getOrigin() const;
+    float getDistanceBetween(const Entity &other) const;
     bool isDead() const;
     void takeDamage(const unsigned amount);
     void takeKnockback(const sf::Vector2f from, const float amount);
@@ -80,10 +83,13 @@ public:
 
 protected:
     Entity* getTarget();
+    void setAOEDamage(const unsigned amount);
+    void setAOEKnockback(const float amount);
     void throwProjectile(std::unique_ptr<Projectile> projectile);
 
     virtual float getRadius() const = 0;
     virtual float getSpeed() const = 0;
+    virtual float getWeight() const = 0;
     virtual unsigned getInitialHealth() const = 0;
     // virtual unsigned getMaximumHealth() const = 0;
     virtual float getAggroRadius() const = 0;
@@ -178,6 +184,7 @@ class GameMap {
     friend class ChunkIterator;
 
     static constexpr float OutsideSpawnWidth = 100.0f;
+    static constexpr float PerTickKnockbackRatio = 1.0f / 100.0f;
 
     const sf::Vector2f chunk_size;
     const sf::Vector2u chunk_amounts;
@@ -215,6 +222,7 @@ private:
 
 public:
     void reset();
-    void updateMovement(const float dt);
+    void updateProjectiles(const float dt);
+    void updateMovement();
     void draw(sf::RenderWindow &window);
 };

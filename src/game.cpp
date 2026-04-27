@@ -14,32 +14,40 @@ class Game {
     bool left_click;
     float zoom_factor;
 
-    const TextureHolder texture_holder;
     std::shared_ptr<GameMap> game_map;
     std::vector<Gang> gangs;
     Gang troops;
 
+    static const sf::Texture start_overlay_texture;
+    static const sf::Texture paused_overlay_texture;
+    static const sf::Texture over_overlay_texture;
     Overlay start_overlay;
     Overlay paused_overlay;
     Overlay over_overlay;
+
     struct WindowData { sf::Vector2u size; sf::Vector2i position; };
     std::optional<WindowData> last_window_data;
     sf::Clock clock;
     sf::RenderWindow window; // window at the end to be as close to updating as possible
 
+    static const sf::Texture arena_texture;
+    static const sf::Texture gravestone_texture;
+
     static constexpr char GameName[] = "Assimilate";
 
     std::shared_ptr<GameMap> makeGameMap() {
-        constexpr sf::Vector2f inner_arena_size = {5000.0f, 5000.0f};
+        const sf::Vector2f outer_arena_size(arena_texture.getSize());
+        constexpr sf::Vector2f edge_size(500.0f, 500.0f);
+        const sf::Vector2f inner_arena_size = outer_arena_size - edge_size * 2.0f;
         const sf::Rect<float> inner_arena(-inner_arena_size / 2.0f, inner_arena_size);
-
-        constexpr sf::Vector2f edge_size(1500.0f, 1500.0f);
-        sf::RectangleShape outer_arena(inner_arena.size + edge_size * 2.0f);
-        outer_arena.setPosition(inner_arena.position - edge_size);
-        outer_arena.setTexture(&texture_holder.getArena());
-
-        const sf::Vector2f chunk_size = {100.0f, 100.0f};
-        const sf::Vector2u chunks((outer_arena.getSize() + chunk_size).componentWiseDiv(chunk_size));
+        sf::RectangleShape outer_arena(outer_arena_size);
+        outer_arena.setPosition(-outer_arena_size / 2.0f);
+        outer_arena.setTexture(&arena_texture);
+        constexpr sf::Vector2f chunk_size(100.0f, 100.0f);
+        const sf::Vector2u chunks(
+            std::ceilf(outer_arena_size.x / chunk_size.x), 
+            std::ceilf(outer_arena_size.y / chunk_size.y)
+        );
         return std::make_shared<GameMap>(chunk_size, chunks, inner_arena, outer_arena);
     }
 public:
@@ -50,9 +58,9 @@ public:
         time_since_last_second(0.0f), frames_since_last_second(0),
         left_click(false), zoom_factor(1.0f),
         game_map(makeGameMap()), troops(Gang(game_map, Team::Player)),
-        start_overlay { sf::Sprite(texture_holder.getStartSign()), Brown, OverlayOrder::Coming },
-        paused_overlay { sf::Sprite(texture_holder.getPausedSign()), Gray, OverlayOrder::Going },
-        over_overlay { sf::Sprite(texture_holder.getOverSign()), Gray, OverlayOrder::Going },
+        start_overlay { sf::Sprite(start_overlay_texture), Brown, OverlayOrder::Coming },
+        paused_overlay { sf::Sprite(paused_overlay_texture), Gray, OverlayOrder::Going },
+        over_overlay { sf::Sprite(over_overlay_texture), Gray, OverlayOrder::Going },
         window(sf::RenderWindow(sf::VideoMode({800, 600}), GameName))
     {
         window.setVisible(false);
@@ -86,18 +94,15 @@ private:
         time_since_started = 0.0f;
 
         troops = Gang(game_map, Team::Player);
-        for(unsigned i = 0; i < 5; i++) {
-            auto ptr = std::make_unique<Grunt>(texture_holder);
-            troops.addEntity(std::move(ptr));
-        }
+        for(int i = 0; i < 5; i++)
+            troops.addEntity(std::make_unique<Grunt>());
 
         gangs.clear();
         for(unsigned i = 0; i < 5; i++) {
             Gang gang(game_map, Team::Enemy);
             unsigned amount = rand() % 5 + 1;
                 for(unsigned j = 0; j < amount; j++) {
-                auto ptr = std::make_unique<Grunt>(texture_holder);
-                gang.addEntity(std::move(ptr));
+                gang.addEntity(std::make_unique<Grunt>());
             }
             gangs.push_back(std::move(gang));
         }
@@ -189,15 +194,59 @@ private:
         if(time_since_last_spawn > time_until_next_spawn) {
             time_since_last_spawn = 0.0f;
             time_until_next_spawn = rand() % 8 + 2;
-            for(unsigned i = 0; i < 1; i++) {
-                Gang gang(game_map, Team::Enemy);
-                unsigned amount = 2.0f * std::pow(time_since_started, 0.66) + 1;
-                for(unsigned j = 0; j < amount; j++) {
-                    auto ptr = std::make_unique<Grunt>(texture_holder);
-                    gang.addEntity(std::move(ptr));
-                }
-                gangs.push_back(std::move(gang));
+            Gang gang(game_map, Team::Enemy);
+            int index_center = time_since_started / 10;
+            int index_spread = index_center + rand() % 3 + rand() % 3 + rand() % 3 - 3;
+            int index_spawn = std::clamp(index_spread, 0, 9);
+            switch (index_spawn) {
+            case 0:
+                for(unsigned i = 0; i < 2; i++) gang.addEntity(std::make_unique<Grunt>());
+                break;
+            case 1:
+                for(unsigned i = 0; i < 5; i++) gang.addEntity(std::make_unique<Grunt>());
+                break;
+            case 2:
+                for(unsigned i = 0; i < 12; i++) gang.addEntity(std::make_unique<Grunt>());
+                break;
+            case 3:
+                for(unsigned i = 0; i < 9; i++) gang.addEntity(std::make_unique<Grunt>());
+                for(unsigned i = 0; i < 2; i++) gang.addEntity(std::make_unique<Knight>());
+                break;
+            case 4:
+                for(unsigned i = 0; i < 3; i++) gang.addEntity(std::make_unique<Knight>());
+                for(unsigned i = 0; i < 1; i++) gang.addEntity(std::make_unique<Mage>());
+                break;
+            case 5:
+                for(unsigned i = 0; i < 7; i++) gang.addEntity(std::make_unique<Knight>());
+                for(unsigned i = 0; i < 2; i++) gang.addEntity(std::make_unique<Mage>());
+                break;
+            case 6:
+                for(unsigned i = 0; i < 16; i++) gang.addEntity(std::make_unique<Knight>());
+                for(unsigned i = 0; i < 3; i++) gang.addEntity(std::make_unique<Mage>());
+                break;
+            case 7:
+                for(unsigned i = 0; i < 3; i++) gang.addEntity(std::make_unique<Samurai>());
+                break;
+            case 8:
+                for(unsigned i = 0; i < 7; i++) gang.addEntity(std::make_unique<Samurai>());
+                break;
+            case 9:
+                for(unsigned i = 0; i < 6; i++) gang.addEntity(std::make_unique<Samurai>());
+                for(unsigned i = 0; i < 1; i++) gang.addEntity(std::make_unique<Minitroll>());
+                break;
+            case 10:
+                for(unsigned i = 0; i < 15; i++) gang.addEntity(std::make_unique<Samurai>());
+                for(unsigned i = 0; i < 1; i++) gang.addEntity(std::make_unique<Minitroll>());
+                break;
+            case 11:
+                for(unsigned i = 0; i < 24; i++) gang.addEntity(std::make_unique<Samurai>());
+                for(unsigned i = 0; i < 2; i++) gang.addEntity(std::make_unique<Minitroll>());
+                break;
+            case 12:
+                gang.addEntity(std::make_unique<Troll>());
+                break;
             }
+            gangs.push_back(std::move(gang));
         }
     }
 
@@ -219,7 +268,8 @@ private:
 
         troops.removeDeadTroops();
 
-        game_map->updateMovement(dt);
+        game_map->updateProjectiles(dt);
+        game_map->updateMovement();
 
         if(troops.isEmpty() && !over_overlay.isIn()) over_overlay.set();
     }
@@ -236,9 +286,9 @@ private:
 
             for(const auto &gang: gangs) {
                 if(auto grave_position = gang.getGravePosition()) {
-                    sf::Sprite grave = sf::Sprite(texture_holder.getGrave());
-                    grave.setPosition(*grave_position - sf::Vector2f(grave.getTexture().getSize()) / 2.0f);
-                    window.draw(grave);
+                    sf::Sprite gravestone(gravestone_texture);
+                    gravestone.setPosition(*grave_position - sf::Vector2f(gravestone.getTexture().getSize()) / 2.0f);
+                    window.draw(gravestone);
                 }
             }
         }
@@ -295,3 +345,9 @@ std::ostream& operator<<(std::ostream& out, const Game &game) {
     out << ", Left clicked: " << game.left_click;
     return out;
 }
+
+const sf::Texture Game::start_overlay_texture = getTexture("assets/start_sign.png");
+const sf::Texture Game::paused_overlay_texture = getTexture("assets/paused_sign.png");
+const sf::Texture Game::over_overlay_texture = getTexture("assets/over_sign.png");
+const sf::Texture Game::arena_texture = getTexture("assets/arena.png");
+const sf::Texture Game::gravestone_texture = getTexture("assets/gravestone.png");
