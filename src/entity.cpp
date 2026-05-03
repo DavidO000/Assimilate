@@ -1,9 +1,3 @@
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <limits>
-#include <math.h>
-#include <SFML/Graphics.hpp>
 #include "entity.hpp"
 
 Projectile::Projectile(const sf::Texture &texture, Entity &entity, const float speed): 
@@ -46,7 +40,8 @@ Team Entity::getTeam() const {
 }
 
 sf::Vector2f Entity::getOrigin() const {
-    return sprite.getPosition() + sf::Vector2f(radius, -radius);
+    sf::Vector2f size = sf::Vector2f(sprite.getTextureRect().size);
+    return sprite.getPosition() + sf::Vector2f(abs(size.x / 2.0f), -radius);
 }
 
 float Entity::getDistanceBetween(const Entity &other) const {
@@ -99,6 +94,11 @@ void Entity::draw(sf::RenderWindow &window) const {
             rect.setPosition(getOrigin());
             window.draw(rect);
         }
+
+        sf::CircleShape circle(radius);
+        circle.setPosition(getOrigin() - sf::Vector2f(radius, radius));
+        circle.setFillColor(sf::Color(0, 255, 0, 32));
+        window.draw(circle);
     #endif
 }
 
@@ -368,6 +368,10 @@ void Gang::update(const float dt) {
             const float distance_to_target = entity->getDistanceBetween(*entity->target);
             if(distance_to_target > entity->getPrefferedAttackRadius()) {
                 entity->walkTowards(entity->target->getOrigin(), dt);
+            } else {
+                const sf::Vector2f delta = entity->target->getOrigin() - entity->getOrigin();
+                const Entity::Direction new_direction = delta.x < 0.0f ? Entity::Direction::Left : Entity::Direction::Right;
+                entity->setDirection(new_direction);
             }
             if(distance_to_target < entity->getAttackRadius()) {
                 entity->attack_counter += dt;

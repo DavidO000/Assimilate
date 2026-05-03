@@ -1,15 +1,15 @@
-#include <SFML/Graphics.hpp>
 #include <iostream>
 #include <random>
+#include <SFML/Graphics.hpp>
 
-static std::random_device rd;
-static std::mt19937 gen(rd());
+// static std::random_device rd;
+// static std::mt19937 gen(rd());
 
 template<typename T> T subSat(const T x, const T y) {
     return y > x ? 0 : x - y;
 }
 
-sf::Vector2f clampPoint(const sf::Vector2f point, const sf::Rect<float> rectangle) {
+template<typename T> sf::Vector2<T> clampPoint(const sf::Vector2<T> point, const sf::Rect<T> rectangle) {
     const auto top_left_corner = rectangle.position;
     const auto bottom_right_corner = top_left_corner + rectangle.size;
     return {
@@ -18,7 +18,7 @@ sf::Vector2f clampPoint(const sf::Vector2f point, const sf::Rect<float> rectangl
     };
 }
 
-sf::Vector2f getRandomRectPosition(const sf::Rect<float> rect) {
+template<typename T> sf::Vector2<T> getRandomRectPosition(const sf::Rect<T> rect) {
     return {
         rand() % int(rect.size.x) + rect.position.x,
         rand() % int(rect.size.y) + rect.position.y
@@ -35,9 +35,6 @@ template<typename T> bool removeFromVector(std::vector<T> *vector, const T &elem
     }
     return false;
 }
-
-
-
 
 // cppcheck-suppress unusedFunction
 [[maybe_unused]] sf::RectangleShape debug_fmt(const sf::RectangleShape rect)  {
@@ -78,8 +75,9 @@ template<typename T> [[maybe_unused]] T debug_fmt(const T &x)  {
 };
 
 // cppcheck-suppress unusedFunction
-[[maybe_unused]] void debug_fmt()  {
-}
+[[maybe_unused]] void debug_fmt()  {}
+
+
 
 // cppcheck-suppress unusedFunction
 template<typename T> [[maybe_unused]] T debug_defer_fmt(const char file[], int line, const char str[], T arg) {

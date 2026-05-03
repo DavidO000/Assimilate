@@ -1,8 +1,3 @@
-#include <iostream>
-#include <vector>
-#include <algorithm>
-#include <SFML/Graphics.hpp>
-#include "utils.cpp"
 #include "entity_textures.cpp"
 
 class Projectile;

@@ -163,8 +163,8 @@ public:
     // float getAttackRadius() const override { return 35.0f; }
     // float getPrefferedAttackRadius() const override { return 25.0f; }
     float getAttackSpeed() const override { return 2.5f; }
-    float getAttackPrepareDuration() const override { return 0.375f; }
-    float getAttackDuration() const override { return 0.25f; }
+    // float getAttackPrepareDuration() const override { return 0.375f; }
+    // float getAttackDuration() const override { return 0.375f; }
     void attack() override {
         setAOEDamage(250);
         setAOEKnockback(150.0);
