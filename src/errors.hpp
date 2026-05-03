@@ -1,4 +1,5 @@
 #include <exception>
+#include "team.cpp"
 
 class LoadTextureException: public std::exception {
     std::string dir_name;

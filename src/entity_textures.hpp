@@ -1,13 +1,4 @@
-#include "utils.cpp"
 #include "errors.cpp"
-
-enum class Team {
-    Player, 
-    Enemy,
-};
-
-bool isEnemyTeam(Team lhs, Team rhs);
-std::ostream& operator<<(std::ostream& out, const Team &team);
 
 inline sf::Texture getTexture(const char *dir_name);
 inline sf::Texture getTexture(std::string &dir_name, const char name[]);

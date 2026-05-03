@@ -200,7 +200,8 @@ Gang::Gang(std::shared_ptr<GameMap> game_map, const Team team):
         move_info.to_wait.time_since_arrived = 0.0f;
         move_info.to_wait.time_to_wait = 0.0f;
     } else {
-        throw UnknownTeam(team);
+        const UnknownTeam unknown_team(team);
+        throw unknown_team;
     }
 }
 

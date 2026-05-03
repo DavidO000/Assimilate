@@ -1,14 +1,5 @@
 #include "entity_textures.hpp"
 
-bool isEnemyTeam(Team lhs, Team rhs) {
-    return lhs != rhs;
-}
-
-std::ostream& operator<<(std::ostream& out, const Team &team) {
-    out << (team == Team::Player ? "Player" : "Enemy");
-    return out;
-}
-
 inline sf::Texture getTexture(const char *dir_name) {
     sf::Texture texture;
     if(!texture.loadFromFile(dir_name)) 
