@@ -182,7 +182,7 @@ public:
 
     static const sf::Texture crater_texture;
 
-    Crater(sf::Vector2f position_): time_since(0), position(position_) {}
+    explicit Crater(sf::Vector2f position_): time_since(0), position(position_) {}
 };
 
 const sf::Texture Crater::crater_texture = getTexture("assets/crater.png");

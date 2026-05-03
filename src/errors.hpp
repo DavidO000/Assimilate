@@ -5,7 +5,7 @@ class LoadTextureException: public std::exception {
     std::string dir_name;
 
 public:
-    explicit LoadTextureException(std::string dir_name_): dir_name(dir_name_) {}
+    explicit LoadTextureException(const std::string &dir_name_): dir_name(dir_name_) {}
 };
 
 class InvarianceException: public std::exception {
@@ -16,7 +16,7 @@ public:
 };
 
 class UnknownTeam: public std::exception {
-    Team team;
+    [[maybe_unused]] Team team;
 
 public:
     explicit UnknownTeam(Team team_): team(team_) {};
