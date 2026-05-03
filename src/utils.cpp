@@ -1,7 +1,7 @@
 #include <iostream>
 #include <random>
 #include <algorithm>
-#include <cmath>
+#include <math.h>
 
 #include <SFML/Graphics.hpp>
 
