@@ -234,7 +234,7 @@ void Game::updateEntities(const float dt) {
 
     try {
         troops.removeDeadTroops();
-    } catch(InvarianceException exception) {
+    } catch(const InvarianceException &exception) {
         std::cerr << "Cache invariance error: " << exception.explination << std::endl;
     }
 

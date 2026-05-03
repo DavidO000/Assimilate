@@ -18,13 +18,13 @@ inline sf::Texture getTexture(std::string &dir_name, const char name[]) {
 
 EntityTextures::EntityTextures(std::string dir_name) {
     std::optional<LoadTextureException> exception;
-    try { player = getTexture(dir_name, "player.png"); } catch(LoadTextureException e) { exception = e; };
-    try { player_prepare_attack = getTexture(dir_name, "player_prepare_attack.png"); } catch(LoadTextureException e) { exception = e; };
-    try { player_attack = getTexture(dir_name, "player_attack.png"); } catch(LoadTextureException e) { exception = e; };
-    try { enemy = getTexture(dir_name, "enemy.png"); } catch(LoadTextureException e) { exception = e; };
-    try { enemy_prepare_attack = getTexture(dir_name, "enemy_prepare_attack.png"); } catch(LoadTextureException e) { exception = e; };
-    try { enemy_attack = getTexture(dir_name, "enemy_attack.png"); } catch(LoadTextureException e) { exception = e; };
-    try { dead = getTexture(dir_name, "dead.png"); } catch(LoadTextureException e) { exception = e; };
+    try { player = getTexture(dir_name, "player.png"); } catch(const LoadTextureException &e) { exception = e; };
+    try { player_prepare_attack = getTexture(dir_name, "player_prepare_attack.png"); } catch(const LoadTextureException &e) { exception = e; };
+    try { player_attack = getTexture(dir_name, "player_attack.png"); } catch(const LoadTextureException &e) { exception = e; };
+    try { enemy = getTexture(dir_name, "enemy.png"); } catch(const LoadTextureException &e) { exception = e; };
+    try { enemy_prepare_attack = getTexture(dir_name, "enemy_prepare_attack.png"); } catch(const LoadTextureException &e) { exception = e; };
+    try { enemy_attack = getTexture(dir_name, "enemy_attack.png"); } catch(const LoadTextureException &e) { exception = e; };
+    try { dead = getTexture(dir_name, "dead.png"); } catch(const LoadTextureException &e) { exception = e; };
     if(exception) throw *exception;
 }
 
