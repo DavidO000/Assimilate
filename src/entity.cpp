@@ -1,4 +1,4 @@
-#include "entity.hpp"
+#include "troops.cpp"
 
 Projectile::Projectile(const sf::Texture &texture, Entity &entity, const float speed): 
     team(entity.team), to_delete(false), sprite(sf::Sprite(texture)) 
@@ -199,6 +199,8 @@ Gang::Gang(std::shared_ptr<GameMap> game_map, const Team team):
         move_info.to_wait.to_wait = false;
         move_info.to_wait.time_since_arrived = 0.0f;
         move_info.to_wait.time_to_wait = 0.0f;
+    } else {
+        throw UnknownTeam(team);
     }
 }
 
@@ -378,6 +380,11 @@ void Gang::update(const float dt) {
                 if(entity->attack_counter > entity->getAttackSpeed()) {
                     entity->attack();
 
+                    const Troll *troll = dynamic_cast<Troll*>(&*entity);
+                    if(troll != nullptr) {
+                        game_map->craters.push_back(Crater(troll->getOrigin() + sf::Vector2f(0, troll->radius)));
+                    }
+
                     if(entity->aoe_damage != 0 || entity->aoe_knockback != 0) {
                         auto aoe_iterator = game_map->iterateChunksInRadius(entity->getOrigin(), entity->getAttackRadius());
                         std::vector<Entity*> entities_hit;
@@ -435,7 +442,7 @@ void Gang::removeDeadTroops() {
     for(unsigned i = 0; i < entities.size();) {
         if(entities[i]->isDead()) {
             if(!removeFromVector(&game_map->all_entities_cache, &*entities[i])) {
-                std::cerr << "Entity cache invariance not upheld" << std::endl;
+                throw InvarianceException("Was not able to remove entity from cache!");
             }
             std::swap(entities[i], entities[entities.size() - 1]);
             entities.pop_back();
@@ -561,6 +568,17 @@ void GameMap::reset() {
 }
 
 void GameMap::updateProjectiles(const float dt) {
+    for(unsigned i = 0; i < craters.size();) {
+        craters[i].time_since += dt;
+
+        if(craters[i].time_since > CraterPermanence) {
+            craters[i] = craters.back();
+            craters.pop_back();
+        } else {
+            i++;
+        }
+    }
+
     for(auto entity: all_entities_cache) {
         projectiles.insert(
             projectiles.end(),
@@ -692,6 +710,15 @@ void GameMap::updateMovement() {
 
 void GameMap::draw(sf::RenderWindow &window) {
     window.draw(outer_arena);
+
+    for(Crater crater: craters) {
+        sf::Sprite crater_sprite(Crater::crater_texture);
+        float percent_visible = 1 - (crater.time_since / CraterPermanence);
+        crater_sprite.setColor(sf::Color(0, 0, 0, 255 * percent_visible));
+        crater_sprite.setPosition(crater.position - sf::Vector2f(Crater::crater_texture.getSize()) / 2.0f);
+        window.draw(crater_sprite);
+    }
+
     #ifndef NDEBUG
         for(auto rect: getSpawnRects()) {
             sf::RectangleShape rectshape(rect.size);
@@ -703,8 +730,8 @@ void GameMap::draw(sf::RenderWindow &window) {
         rectshape.setPosition(inner_arena.position);
         rectshape.setFillColor(sf::Color(255, 255, 255, 16));
         window.draw(rectshape);
-        
     #endif
+
     std::sort(all_entities_cache.begin(), all_entities_cache.end(), 
         [](const Entity *x, const Entity *y) {
             if(x->isDead() && !y->isDead()) return true;

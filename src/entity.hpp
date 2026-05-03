@@ -175,12 +175,25 @@ public:
     std::vector<Entity*> *next();
 };
 
+class Crater {
+public:
+    float time_since;
+    sf::Vector2f position;
+
+    static const sf::Texture crater_texture;
+
+    Crater(sf::Vector2f position_): position(position_), time_since(0) {}
+};
+
+const sf::Texture Crater::crater_texture = getTexture("assets/crater.png");
+
 class GameMap {
     friend class Gang;
     friend class ChunkIterator;
 
     static constexpr float OutsideSpawnWidth = 100.0f;
     static constexpr float PerTickKnockbackRatio = 1.0f / 100.0f;
+    static constexpr float CraterPermanence = 2.0f;
 
     const sf::Vector2f chunk_size;
     const sf::Vector2u chunk_amounts;
@@ -192,6 +205,7 @@ class GameMap {
     std::vector<std::vector<Entity*>> map;
 
     std::vector<std::unique_ptr<Projectile>> projectiles;
+    std::vector<Crater> craters;
 
 public:
     GameMap(

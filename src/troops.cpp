@@ -1,4 +1,4 @@
-#include "entity.cpp"
+#include "entity.hpp"
 
 class Fireball: public Projectile {
     static const sf::Texture texture;

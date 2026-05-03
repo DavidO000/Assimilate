@@ -1,6 +1,6 @@
 #include "game.hpp"
 
- std::shared_ptr<GameMap> Game::makeGameMap() {
+std::shared_ptr<GameMap> Game::makeGameMap() {
     const sf::Vector2f outer_arena_size(arena_texture.getSize());
     constexpr sf::Vector2f edge_size(500.0f, 500.0f);
     const sf::Vector2f inner_arena_size = outer_arena_size - edge_size * 2.0f;
@@ -10,7 +10,7 @@
     outer_arena.setTexture(&arena_texture);
     constexpr sf::Vector2f chunk_size(100.0f, 100.0f);
     const sf::Vector2u chunks(
-        std::ceil(outer_arena_size.x / chunk_size.x), 
+        std::ceil(outer_arena_size.x / chunk_size.x),
         std::ceil(outer_arena_size.y / chunk_size.y)
     );
     return std::make_shared<GameMap>(chunk_size, chunks, inner_arena, outer_arena);
@@ -232,7 +232,11 @@ void Game::updateEntities(const float dt) {
     for(auto &gang: gangs) gang.update(dt);
     troops.update(dt);
 
-    troops.removeDeadTroops();
+    try {
+        troops.removeDeadTroops();
+    } catch(InvarianceException exception) {
+        std::cerr << "Cache invariance error: " << exception.explination << std::endl;
+    }
 
     game_map->updateProjectiles(dt);
     game_map->updateMovement();

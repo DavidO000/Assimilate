@@ -1,4 +1,4 @@
-#include "troops.cpp"
+#include "entity.cpp"
 #include "overlay.cpp"
 
 class Game {
@@ -37,7 +37,7 @@ class Game {
     static const sf::Texture arena_texture;
     static const sf::Texture gravestone_texture;
 
-    std::shared_ptr<GameMap> makeGameMap();
+    static std::shared_ptr<GameMap> makeGameMap();
 
 public:
     Game();
