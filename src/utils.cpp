@@ -1,6 +1,8 @@
 #include <iostream>
 #include <random>
 #include <algorithm>
+#include <cmath>
+
 #include <SFML/Graphics.hpp>
 
 // static std::random_device rd;
