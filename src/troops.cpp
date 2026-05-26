@@ -13,6 +13,9 @@ public:
             to_delete = false;
         }
     }
+
+    Fireball& operator=(const Fireball&) = default;
+    Fireball& operator=(Fireball&&) = default;
 };
 const sf::Texture Fireball::texture = getTexture("assets/mage/fireball.png");
 
@@ -38,6 +41,10 @@ public:
     float getAttackDuration() const override { return 0.25f; }
     void attack() override {
         getTarget()->takeDamage(30);
+    }
+
+    std::ostream& print(std::ostream& out) const override {
+        return out << "GRUNT:" << std::endl << static_cast<const Entity*>(this);
     }
 };
 const EntityTextures Grunt::textures = EntityTextures("assets/grunt/");
@@ -65,6 +72,10 @@ public:
     void attack() override {
         getTarget()->takeDamage(120);
     }
+
+    std::ostream& print(std::ostream& out) const override {
+        return out << "Knight:" << std::endl << static_cast<const Entity*>(this);
+    }
 };
 const EntityTextures Knight::textures = EntityTextures("assets/knight/");
 
@@ -88,6 +99,10 @@ public:
     float getAttackDuration() const override { return 0.5f; }
     void attack() override {
         throwProjectile(std::make_unique<Fireball>(*this));
+    }
+
+    std::ostream& print(std::ostream& out) const override {
+        return out << "Mage:" << std::endl << static_cast<const Entity*>(this);
     }
 };
 const EntityTextures Mage::textures = EntityTextures("assets/mage/");
@@ -114,6 +129,10 @@ public:
     void attack() override {
         getTarget()->takeDamage(45);
         getTarget()->takeKnockback(getOrigin(), -10.0);
+    }
+
+    std::ostream& print(std::ostream& out) const override {
+        return out << "Samurai:" << std::endl << static_cast<const Entity*>(this);
     }
 };
 const EntityTextures Samurai::textures = EntityTextures("assets/samurai/");
@@ -142,6 +161,10 @@ public:
         setAOEDamage(175);
         setAOEKnockback(100.0);
     }
+
+    std::ostream& print(std::ostream& out) const override {
+        return out << "Minitroll:" << std::endl << static_cast<const Entity*>(this);
+    }
 };
 const EntityTextures Minitroll::textures = EntityTextures("assets/minitroll/");
 
@@ -168,6 +191,10 @@ public:
     void attack() override {
         setAOEDamage(250);
         setAOEKnockback(150.0);
+    }
+
+    std::ostream& print(std::ostream& out) const override {
+        return out << "Troll:" << std::endl << static_cast<const Entity*>(this);
     }
 };
 const EntityTextures Troll::textures = EntityTextures("assets/troll/");

@@ -52,15 +52,15 @@ void Game::resetMap() {
 
     troops = Gang(game_map, Team::Player);
     #ifndef NDEBUG
-        troops.addEntity(std::make_unique<Grunt>());
-        troops.addEntity(std::make_unique<Knight>());
-        troops.addEntity(std::make_unique<Samurai>());
-        troops.addEntity(std::make_unique<Mage>());
-        troops.addEntity(std::make_unique<Minitroll>());
-        troops.addEntity(std::make_unique<Troll>());
+        troops.addEntity(EntityType::Grunt);
+        troops.addEntity(EntityType::Knight);
+        troops.addEntity(EntityType::Samurai);
+        troops.addEntity(EntityType::Mage);
+        troops.addEntity(EntityType::Minitroll);
+        troops.addEntity(EntityType::Troll);
     #else
         for(int i = 0; i < 5; i++)
-            troops.addEntity(std::make_unique<Grunt>());
+            troops.addEntity(EntityType::Grunt);
     #endif
 
     gangs.clear();
@@ -68,7 +68,7 @@ void Game::resetMap() {
         Gang gang(game_map, Team::Enemy);
         unsigned amount = rand() % 5 + 1;
             for(unsigned j = 0; j < amount; j++) {
-            gang.addEntity(std::make_unique<Grunt>());
+            gang.addEntity(EntityType::Grunt);
         }
         gangs.push_back(std::move(gang));
     }
@@ -149,6 +149,14 @@ void Game::handleInput() {
                 potentiallyStart();
             } else if(key_event->code == sf::Keyboard::Key::Space) {
                 potentiallyStart();
+            } else if(key_event->code == sf::Keyboard::Key::A) {
+                debug_reports.push_back(DBGReport(float).with_object(time_since_started));
+            } else if(key_event->code == sf::Keyboard::Key::B) {
+                debug_reports.push_back(DBGReport(float).with_object(time_since_last_spawn));
+            } else if(key_event->code == sf::Keyboard::Key::P) {
+                for(DebugReport debug_report: debug_reports) {
+                    std::cout << debug_report << std::endl;
+                }
             }
         }
     }
@@ -166,50 +174,50 @@ void Game::handleSpawning(const float dt) {
         int index_spawn = std::clamp(index_spread, 0, 9);
         switch (index_spawn) {
         case 0:
-            for(unsigned i = 0; i < 2; i++) gang.addEntity(std::make_unique<Grunt>());
+            for(unsigned i = 0; i < 2; i++) gang.addEntity(EntityType::Grunt);
             break;
         case 1:
-            for(unsigned i = 0; i < 5; i++) gang.addEntity(std::make_unique<Grunt>());
+            for(unsigned i = 0; i < 5; i++) gang.addEntity(EntityType::Grunt);
             break;
         case 2:
-            for(unsigned i = 0; i < 12; i++) gang.addEntity(std::make_unique<Grunt>());
+            for(unsigned i = 0; i < 12; i++) gang.addEntity(EntityType::Grunt);
             break;
         case 3:
-            for(unsigned i = 0; i < 9; i++) gang.addEntity(std::make_unique<Grunt>());
-            for(unsigned i = 0; i < 2; i++) gang.addEntity(std::make_unique<Knight>());
+            for(unsigned i = 0; i < 9; i++) gang.addEntity(EntityType::Grunt);
+            for(unsigned i = 0; i < 2; i++) gang.addEntity(EntityType::Knight);
             break;
         case 4:
-            for(unsigned i = 0; i < 3; i++) gang.addEntity(std::make_unique<Knight>());
-            for(unsigned i = 0; i < 1; i++) gang.addEntity(std::make_unique<Mage>());
+            for(unsigned i = 0; i < 3; i++) gang.addEntity(EntityType::Knight);
+            for(unsigned i = 0; i < 1; i++) gang.addEntity(EntityType::Mage);
             break;
         case 5:
-            for(unsigned i = 0; i < 7; i++) gang.addEntity(std::make_unique<Knight>());
-            for(unsigned i = 0; i < 2; i++) gang.addEntity(std::make_unique<Mage>());
+            for(unsigned i = 0; i < 7; i++) gang.addEntity(EntityType::Knight);
+            for(unsigned i = 0; i < 2; i++) gang.addEntity(EntityType::Mage);
             break;
         case 6:
-            for(unsigned i = 0; i < 16; i++) gang.addEntity(std::make_unique<Knight>());
-            for(unsigned i = 0; i < 3; i++) gang.addEntity(std::make_unique<Mage>());
+            for(unsigned i = 0; i < 16; i++) gang.addEntity(EntityType::Knight);
+            for(unsigned i = 0; i < 3; i++) gang.addEntity(EntityType::Mage);
             break;
         case 7:
-            for(unsigned i = 0; i < 3; i++) gang.addEntity(std::make_unique<Samurai>());
+            for(unsigned i = 0; i < 3; i++) gang.addEntity(EntityType::Samurai);
             break;
         case 8:
-            for(unsigned i = 0; i < 7; i++) gang.addEntity(std::make_unique<Samurai>());
+            for(unsigned i = 0; i < 7; i++) gang.addEntity(EntityType::Samurai);
             break;
         case 9:
-            for(unsigned i = 0; i < 6; i++) gang.addEntity(std::make_unique<Samurai>());
-            for(unsigned i = 0; i < 1; i++) gang.addEntity(std::make_unique<Minitroll>());
+            for(unsigned i = 0; i < 6; i++) gang.addEntity(EntityType::Samurai);
+            for(unsigned i = 0; i < 1; i++) gang.addEntity(EntityType::Minitroll);
             break;
         case 10:
-            for(unsigned i = 0; i < 15; i++) gang.addEntity(std::make_unique<Samurai>());
-            for(unsigned i = 0; i < 1; i++) gang.addEntity(std::make_unique<Minitroll>());
+            for(unsigned i = 0; i < 15; i++) gang.addEntity(EntityType::Samurai);
+            for(unsigned i = 0; i < 1; i++) gang.addEntity(EntityType::Minitroll);
             break;
         case 11:
-            for(unsigned i = 0; i < 24; i++) gang.addEntity(std::make_unique<Samurai>());
-            for(unsigned i = 0; i < 2; i++) gang.addEntity(std::make_unique<Minitroll>());
+            for(unsigned i = 0; i < 24; i++) gang.addEntity(EntityType::Samurai);
+            for(unsigned i = 0; i < 2; i++) gang.addEntity(EntityType::Minitroll);
             break;
         case 12:
-            gang.addEntity(std::make_unique<Troll>());
+            gang.addEntity(EntityType::Troll);
             break;
         }
         gangs.push_back(std::move(gang));

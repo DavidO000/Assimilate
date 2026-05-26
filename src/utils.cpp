@@ -97,3 +97,37 @@ template<typename T> [[maybe_unused]] T debug_defer_fmt(const char file[], int l
 
 #define DBG(...) debug_defer_fmt(__FILE__, __LINE__, #__VA_ARGS__, __VA_ARGS__)
 #define DBGE(...) debug_defer_fmt(__FILE__, __LINE__)
+
+// cppcheck-suppress unusedFunction
+template<typename T>
+class DebugReport {
+    char *file;
+    std::optional<int> line;
+    std::optional<T> copied_object;
+
+public:
+    DebugReport(): file(nullptr), line(), copied_object() {}
+    
+    DebugReport &with_file(const char *p_file) { file = const_cast<char*>(p_file); return *this; }
+    DebugReport &with_line(int p_line) { line = p_line; return *this; }
+    DebugReport &with_object(T p_object) { copied_object = p_object; return *this; }
+
+    friend std::ostream& operator<<(std::ostream& out, const DebugReport &debug_report) {
+        if(debug_report.file == nullptr && !debug_report.line && !debug_report.copied_object) {
+            out << "Empty debug report.";
+        } else {
+            if(debug_report.file != nullptr) {
+                out << "On file " << debug_report.file << " ";
+            }
+            if(debug_report.line) {
+                out << "On line " << *debug_report.line << " ";
+            }
+            if(debug_report.copied_object) {
+                out << "We have " << *debug_report.copied_object << ".";
+            }
+        }
+        return out;
+    }
+};
+
+#define DBGReport(x) DebugReport<x>().with_file(&__FILE__[0]).with_line(__LINE__) 

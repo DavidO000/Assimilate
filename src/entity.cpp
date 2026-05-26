@@ -26,13 +26,16 @@ Entity::Entity(const EntityTextures &textures_):
     health(0), attack_counter(0.0f), time_since_attacked(INFINITY),
     time_since_revived(0.0f), time_since_was_attacked(INFINITY) {}
 
-std::ostream& operator<<(std::ostream& out, const Entity &entity) {
-    out << "Textures: " << entity.textures 
-        << ", Position: " << entity.getOrigin().x << ", " << entity.getOrigin().y
-        << ", Size: " << entity.sprite.getTexture().getSize().x << ", " << entity.sprite.getTexture().getSize().y
-        << ", Scale: " << entity.sprite.getScale().x << ", " << entity.sprite.getScale().y
-        << ", Radius: " << entity.getRadius() << " , Health: " << entity.health; 
-    return out;
+std::ostream &Entity::print(std::ostream &out) const {
+    return out << "Textures: " << textures 
+        << ", Position: " << getOrigin().x << ", " << getOrigin().y
+        << ", Size: " << sprite.getTexture().getSize().x << ", " << sprite.getTexture().getSize().y
+        << ", Scale: " << sprite.getScale().x << ", " << sprite.getScale().y
+        << ", Radius: " << getRadius() << " , Health: " << health; 
+}
+
+std::ostream &operator<<(std::ostream &out, const Entity &entity) {
+    return entity.print(out);
 }
 
 Team Entity::getTeam() const {
@@ -216,7 +219,7 @@ std::ostream& operator<<(std::ostream& out, const Gang &gang) {
     return out;
 }
 
-void Gang::addEntity(std::unique_ptr<Entity> entity) {
+void Gang::addEntityInternal(std::unique_ptr<Entity> entity) {
     entity->team = team;
     entity->health = entity->getInitialHealth();
     entity->radius = entity->getRadius();
@@ -228,6 +231,32 @@ void Gang::addEntity(std::unique_ptr<Entity> entity) {
 
     game_map->all_entities_cache.push_back(entity.get());
     entities.push_back(std::move(entity));
+}
+
+void Gang::addEntity(EntityType entity_type) {
+    switch(entity_type) {
+    case EntityType::Grunt:
+        addEntityInternal(std::make_unique<Grunt>());
+        break;
+    case EntityType::Knight:
+        addEntityInternal(std::make_unique<Knight>());
+        break;
+    case EntityType::Samurai:
+        addEntityInternal(std::make_unique<Samurai>());
+        break;
+    case EntityType::Mage:
+        addEntityInternal(std::make_unique<Mage>());
+        break;
+    case EntityType::Minitroll:
+        addEntityInternal(std::make_unique<Minitroll>());
+        break;
+    case EntityType::Troll:
+        addEntityInternal(std::make_unique<Troll>());
+        break;
+    default:
+        // impossible
+        break;
+    }
 }
 
 bool Gang::isEmpty() const {

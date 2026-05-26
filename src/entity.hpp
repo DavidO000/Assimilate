@@ -21,6 +21,8 @@ public:
     
     Projectile(const sf::Texture &texture, Entity &entity, const float speed);
     virtual ~Projectile() = default;
+    virtual Projectile& operator=(const Projectile&) = default;
+    virtual Projectile& operator=(Projectile&&) = default;
     sf::Vector2f getOrigin() const;
 };
 
@@ -67,7 +69,8 @@ public:
     Entity& operator=(const Entity&) = delete;
     Entity(Entity&&) = delete;
     Entity& operator=(Entity&&) = delete;
-    friend std::ostream& operator<<(std::ostream& out, const Entity &entity);
+    virtual std::ostream &print(std::ostream &out) const;
+    friend std::ostream &operator<<(std::ostream &out, const Entity &entity);
 
     Team getTeam() const;
     sf::Vector2f getOrigin() const;
@@ -110,6 +113,10 @@ private:
     void update(const float dt);
 };
 
+enum class EntityType {
+    Grunt, Knight, Mage, Samurai, Minitroll, Troll
+};
+
 class Gang {
     Team team;
     std::vector<std::unique_ptr<Entity>> entities;
@@ -127,6 +134,7 @@ class Gang {
     std::optional<sf::Vector2f> grave_position;
     
     sf::Vector2f makeSpawnPoint() const;
+    void addEntityInternal(std::unique_ptr<Entity> entity);
 
 public:
     Gang(std::shared_ptr<GameMap> game_map, const Team team);
@@ -138,7 +146,7 @@ public:
     Gang& operator=(Gang&&) = default;
     friend std::ostream& operator<<(std::ostream& out, const Gang &gang);
 
-    void addEntity(std::unique_ptr<Entity> entity);
+    void addEntity(EntityType entity_type);
 
     bool isEmpty() const;
     std::optional<sf::Vector2f> getGravePosition() const;

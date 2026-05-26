@@ -37,6 +37,8 @@ class Game {
     static const sf::Texture arena_texture;
     static const sf::Texture gravestone_texture;
 
+    std::vector<DebugReport<float>> debug_reports;
+
     static std::shared_ptr<GameMap> makeGameMap();
 
 public:
